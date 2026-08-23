@@ -1,3 +1,55 @@
+<!-- FORJA v30.0.0 - BRASA ESCURO (tema novo do app inteiro)
+     Virada visual completa: o app sai do papel branco-frio da v29 e vira
+     forja - carvao, aco e brasa. Nao e so inverter cor: a paleta foi
+     VALIDADA por script (contraste WCAG, separacao sob daltonismo e piso de
+     visao normal em OKLab) contra a superficie escura, e um achado forcou
+     mudanca de desenho: dia A (vermelho) x dia B (ambar) reprovam o piso de
+     visao normal (dE 13.8 < 15) e ficam identicos sob deuteranopia (dE 2.9).
+     Por isso identidade de dia NUNCA depende so da cor - a letra anda junto.
+     Tambem subiu --text-faint de #6B7686 (3.90:1, reprovava texto pequeno)
+     pra #7C8797 (4.94:1).
+
+     O QUE MUDOU
+     - Tokens do :root re-passados pra superficie escura (MESMOS NOMES, so os
+       valores mudam - todo CSS e JS que le --acc, --accent-a etc. segue igual).
+     - Camada de override do Tailwind reescrita: a v29 puxava as utilitarias
+       dark compiladas pro claro; a v30 as leva pro BRASA. Mesmo mecanismo,
+       destino oposto.
+     - Cards viraram placa de metal (fio de luz no topo + sombra funda),
+       botoes ganharam relevo, inputs viraram poco escuro, cabecalhos fixos
+       ganharam aco escovado + vidro fosco.
+     - ILUSTRACOES DE EXERCICIO: as 50 imagens do banco tem fundo BRANCO, que
+       no escuro vira um bloco de luz no meio do card. Foram classificadas
+       (medindo saturacao, fracao de branco e rampa de cinza) em 3 familias e
+       cada uma tem tratamento proprio: 27 de TRACO (linha preta no branco)
+       levam contrast->invert->mix-blend-mode:screen, e o fundo SOME por
+       completo, sobrando o traco aceso sobre o metal; 15 de RENDER 3D e 8 de
+       FOTO levam chapa quente com mascara radial (inverter estragaria: o
+       corpo cinza some e o vermelho do musculo vira ciano). Arquivo
+       desconhecido cai em 'foto', que e o tratamento seguro.
+     - BRASA ENTRE CARDS: a barrinha colorida por card do plano virou um
+       TRILHO continuo de metal quente que atravessa a lista inteira, com
+       brasas descendo por dentro. Tudo CSS - zero JS, zero custo por card.
+     - Cena da forja do hero redesenhada (bigorna com volume e cepo, gradiente
+       de temperatura no lingote, martelo com antecipacao e recuo, faiscas em
+       parabola, brasas subindo, fumaca).
+     - Chart.js re-tematizado (grade e eixos recessivos, area da brasa) e a
+       paleta de series trocada pela ordem validada.
+
+     CUSTO E ACESSIBILIDADE (criterio de primeira classe - o app roda no
+     celular, na academia): NENHUMA animacao mexe em box-shadow, filter,
+     width ou background-position - so transform e opacity. Todo efeito
+     decorativo desliga em prefers-reduced-motion. Nada de loading="lazy" em
+     <img> (o bug da v29.8.1: dentro de container position:fixed o Chrome
+     pode nunca disparar o load).
+
+     NAO ENTROU NESTA VERSAO (desenhado, revisado e aprovado no mockup, mas
+     ainda nao integrado - trocar essas telas mexe em funcao de render, nao
+     so em cor): mapa muscular anatomico (dois corpos SVG com 16 grupos
+     pintados por recuperacao), pack de graficos proprios em SVG, calendario
+     mapa-de-calor + aneis de consistencia, e o jogo de 36 icones que
+     substitui os emoji. Ver forja/mockup-brasa-v2.html.
+-->
 <!-- FORJA v29.10.0 - CONSOLE FERRO (aba somente leitura)
      Aba nova #console atras do login do aluno, botao no grid de CTAs. Existe
      porque os dois textos mais importantes do banco eram invisiveis no app:
@@ -48,6 +100,16 @@
      timestamp corrompido virava pseudo-data que ordena como string,
      sequestrava a "ultima vez" do dia e quebrava a rotacao. Registro com data
      ilegivel agora vira contador visivel no header, nao some calado.
+     BUGFIX GLOBAL (unica mudanca de logica fora da ilha): o proprio
+     dataLocalIso() agora devolve '' quando nao consegue parsear, em vez do
+     antigo s.slice(0, 10). Aquele slice era inalcancavel pra data boa (o
+     match de prefixo ISO logo acima ja teria retornado), entao so emitia
+     pseudo-data - e pseudo-data ordena como string e ganha de qualquer data
+     real no '>'. Corrige de uma vez o "ULT: A - traco" do painel do aluno, o
+     "ultima sessao" travado no dashboard do trainer, o filtrarPeriodo() e o
+     ultimoRegistroDe(). Auditado nos ~20 consumidores de dataSessao(): todos
+     ja toleram '' (guarda `if (!d) return`, `.filter(Boolean)` ou
+     localeCompare), nenhum quebra.
      CSS: ilha ESCURA (#14171A) dentro do app claro, TODA escopada em .frc,
      com nomes que nao colidem com as globais do app (.pill/.act/.disp no
      lugar de .chip/.btn/.display). Sem utilitaria Tailwind nova — o Tailwind
@@ -344,45 +406,60 @@
      offline. -->
 <style>
   :root {
-    /* ===== v29 DESIGN SYSTEM CLARO ===== */
-    --bg: #F6F7F9;             /* ground papel branco-frio */
-    --bg-soft: #EFF1F4;
-    --bg-card: #FFFFFF;
-    --border: #E7EAEE;
-    --border-hot: #DCE0E6;
-    --text: #0E1116;
-    --text-dim: #5B6472;
-    --text-faint: #8B93A0;
-    --accent-a: #DC2626;       /* dia A */
-    --accent-b: #C77400;       /* dia B */
-    --accent-c: #10935E;       /* dia C + feito/recuperado */
-    --accent-d: #0E7490;       /* dia D */
-    --accent-e: #7C3AED;       /* dia E */
-    --admin: #B23A12;
-    --acc: #EE5622;            /* accent unico BRASA */
-    --acc-soft: #FDECE5;
-    --acc-ink: #B23A12;        /* brasa p/ texto pequeno (contraste) */
-    --ok-soft: #E4F4EC;
-    --ok-ink: #0B6E46;
+    /* ===== v30 DESIGN SYSTEM BRASA ESCURO =====
+       Paleta validada por script (skill dataviz) contra a superficie #12171F:
+       rampa brasa aprovada como ordinal, trio de status aprovado all-pairs,
+       categorica de 6 aprovada na lista adjacente. NAO ajustar no olho. */
+    --bg: #0B0E13;             /* ground: carvao */
+    --bg-soft: #12171F;
+    --bg-card: #171E28;
+    --border: #242C38;
+    --border-hot: #323C4B;
+    --text: #E9EDF3;
+    --text-dim: #98A2B1;
+    --text-faint: #7C8797;     /* v30: era #6B7686 = 3.90:1, reprovava texto pequeno */
+    /* dias: passos re-calculados pra superficie escura.
+       ATENCAO: dia A x dia B reprovam o piso de visao normal (dE 13.8 < 15) e
+       somem sob deuteranopia (dE 2.9) — por isso identidade de dia SEMPRE
+       carrega a letra junto, nunca so a cor. */
+    --accent-a: #EB4D45;
+    --accent-b: #BE7C05;
+    --accent-c: #09A66B;
+    --accent-d: #0598CE;
+    --accent-e: #9276E2;
+    --admin: #FF7645;
+    --acc: #E85616;            /* brasa (marca) */
+    --acc-soft: rgba(232,86,22,0.14);
+    --acc-ink: #FF7645;        /* brasa p/ texto pequeno: 6.79:1 */
+    --ok-soft: rgba(9,166,107,0.14);
+    --ok-ink: #3FD9A0;
     --steel: #1B2430;
-    /* compat: --ctx era a cor de contexto mutavel via JS (agora fixa = brasa) */
-    --ctx: #EE5622;
-    --ctx-soft: rgba(238,86,34,0.12);
+    --ctx: #E85616;
+    --ctx-soft: rgba(232,86,22,0.14);
+    /* rampa brasa (magnitude) + superficies extras usadas pelas pecas v30 */
+    --brasa-1: #973101; --brasa-2: #C54302; --brasa-3: #E85616; --brasa-4: #FF7645;
+    --brasa-glow: #FF8A4C;
+    --surface-1: #12171F; --surface-2: #171E28; --surface-3: #1D2531;
+    --line: #242C38; --line-hot: #323C4B;
+    --ok: #09A66B; --cardio: #0598CE; --falta: #EB4D45; --vazio: #2A3340;
+    --cat-1: #E85616; --cat-2: #0598CE; --cat-3: #09A66B;
+    --cat-4: #BE7C05; --cat-5: #9276E2; --cat-6: #EB4D45;
   }
   * { box-sizing: border-box; }
   html, body {
     color: var(--text);
     font-family: 'DM Sans', system-ui, sans-serif;
-    background-color: #F6F7F9;
+    background-color: #0B0E13;
+    color-scheme: dark;
   }
-  /* BASE CLARA v29: papel branco-frio + leve luz no topo (sem grade/orbs/vinheta) */
+  /* BASE v30 BRASA: carvao + brasa acesa no alto da tela */
   body {
     margin: 0;
     min-height: 100vh;
     position: relative;
     background:
-      radial-gradient(90% 55% at 50% -10%, #FFFFFF 0%, rgba(255,255,255,0) 60%),
-      #F6F7F9;
+      radial-gradient(120% 55% at 50% -10%, rgba(255,107,51,0.13) 0%, rgba(255,107,51,0) 62%),
+      linear-gradient(180deg, #0D1117 0%, #0B0E13 100%);
     background-attachment: fixed;
     overflow-x: hidden;
   }
@@ -396,9 +473,9 @@
   .toast { animation: slideIn 0.2s ease-out; }
   @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-  /* inputs claros (v29) */
+  /* inputs v30: poco escuro com sombra interna */
   input, textarea, select {
-    background: #FFFFFF;
+    background: #0E131A;
     border: 1.5px solid var(--border-hot);
     color: var(--text);
     padding: 0.55rem 0.8rem;
@@ -407,56 +484,67 @@
     outline: none;
     transition: border-color 0.15s, box-shadow 0.2s, background 0.2s;
     border-radius: 11px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35) inset;
   }
   input::placeholder, textarea::placeholder { color: var(--text-faint); }
   input:focus, textarea:focus, select:focus {
     border-color: var(--acc);
-    box-shadow: 0 0 0 3px var(--acc-soft);
-    background: #FFFFFF;
+    box-shadow: 0 0 0 3px var(--acc-soft), 0 2px 6px rgba(0,0,0,0.35) inset;
+    background: #0E131A;
   }
   input[type="number"] { -moz-appearance: textfield; }
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-  /* BOTOES claros (v29): borda fina, sombra suave, CTA brasa */
+  /* BOTOES v30: placa de metal com fio de luz; CTA em brasa incandescente */
   .btn {
     position: relative;
     padding: 0.65rem 1.05rem;
+    min-height: 44px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.75rem;
     letter-spacing: 0.12em;
     border: 1px solid var(--border-hot);
-    background: #FFFFFF;
+    background: linear-gradient(180deg, var(--surface-3), #141A23);
     color: var(--text-dim);
     cursor: pointer;
-    transition: all 0.18s ease;
+    transition: transform 0.12s ease, border-color 0.18s, color 0.18s;
     text-transform: uppercase;
     border-radius: 11px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.07) inset, 0 6px 14px -8px #000;
   }
-  .btn:hover { border-color: var(--text-dim); color: var(--text); box-shadow: 0 2px 10px rgba(14,17,22,0.08); }
-  .btn-primary { background: var(--acc); color: #FFFFFF; border-color: var(--acc); box-shadow: 0 8px 18px -8px rgba(238,86,34,0.6); }
-  .btn-primary:hover { background: #D8481B; border-color: #D8481B; color: #FFFFFF; box-shadow: 0 10px 22px -8px rgba(238,86,34,0.7); }
-  .btn-danger:hover { border-color: var(--accent-a); color: var(--accent-a); box-shadow: 0 2px 10px rgba(220,38,38,0.15); }
-  .btn-success { background: var(--accent-c); color: #FFFFFF; border-color: var(--accent-c); box-shadow: 0 8px 18px -8px rgba(16,147,94,0.5); }
-  .btn-success:hover { background: #0B8A55; border-color: #0B8A55; color: #FFFFFF; box-shadow: 0 10px 22px -8px rgba(16,147,94,0.6); }
+  .btn:hover { border-color: var(--line-hot); color: var(--text); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: linear-gradient(180deg,#FF7645,#E85616 48%,#C54302); color: #FFFFFF; border-color: transparent;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.35) inset, 0 0 0 1px rgba(255,107,51,0.35), 0 14px 30px -12px rgba(255,107,51,0.75); }
+  .btn-primary:hover { background: linear-gradient(180deg,#FF8A5C,#F05E1C 48%,#D24A05); color: #FFFFFF; }
+  .btn-danger:hover { border-color: var(--accent-a); color: var(--accent-a); }
+  .btn-success { background: linear-gradient(180deg,#2FD79A,#09A66B 50%,#067A4E); color: #FFFFFF; border-color: transparent;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.30) inset, 0 14px 30px -14px rgba(9,166,107,0.8); }
+  .btn-success:hover { background: linear-gradient(180deg,#45E3AB,#0BBA79 50%,#078A58); color: #FFFFFF; }
 
-  .chip { padding: 0.14rem 0.55rem; font-size: 0.625rem; letter-spacing: 0.1em; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); }
+  .chip { padding: 0.14rem 0.55rem; font-size: 0.625rem; letter-spacing: 0.1em; border: 1px solid var(--border-hot); border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--text-dim); }
 
-  /* CARDS brancos (v29): borda hairline + sombra suave em 2 camadas */
+  /* CARDS v30: placa de metal — fio de luz no topo, sombra funda embaixo */
   .glass {
     position: relative;
-    background: #FFFFFF;
+    background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
     border: 1px solid var(--border);
     border-radius: 16px;
     box-shadow:
-      0 1px 2px rgba(14,17,22,0.04),
-      0 10px 28px -14px rgba(14,17,22,0.10);
+      0 1px 0 rgba(255,255,255,0.05) inset,
+      0 18px 40px -24px #000;
     transition: box-shadow 0.25s, border-color 0.25s;
+  }
+  .glass::after {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 1px; border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.16) 75%, transparent);
   }
   .glass:hover {
     border-color: var(--border-hot);
     box-shadow:
-      0 2px 4px rgba(14,17,22,0.05),
-      0 14px 34px -14px rgba(14,17,22,0.14);
+      0 1px 0 rgba(255,255,255,0.08) inset,
+      0 22px 48px -24px #000;
   }
 
   /* v29: panel-ctx agora e um realce sutil */
@@ -482,12 +570,12 @@
   table.editable input { width: 100%; }
 
   /* avatars */
-  .avatar { width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.125rem; border-radius: 10px; }
+  .avatar { width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.125rem; border-radius: 10px; box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 18px -10px rgba(255,107,51,0.8); }
 
   /* tabs (v29: ativa = pill escura solida, sem glow por dia) */
   .tab-btn { padding: 0.5rem 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; border-bottom: 2px solid transparent; color: var(--text-faint); cursor: pointer; text-transform: uppercase; transition: color 0.15s, background 0.15s; border-radius: 9px 9px 0 0; }
-  .tab-btn:hover { color: var(--text-dim); background: var(--bg-soft); }
-  .tab-btn.active { color: #FFFFFF; background: var(--text); border-bottom-color: transparent; border-radius: 9px; }
+  .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .tab-btn.active { color: #FFFFFF; background: linear-gradient(180deg,#FF7645,#C54302); border-bottom-color: transparent; border-radius: 9px; box-shadow: 0 8px 18px -10px rgba(255,107,51,0.7); }
 
   /* sombras */
   .shadow-hot { box-shadow: 0 0 0 1px var(--border-hot); }
@@ -502,35 +590,12 @@
 
   /* v29: .hero-glow e .corners viraram no-op (classes seguem no markup sem efeito) */
 
-  /* ===== v29: CENA DA FORJA (home hero) — martelo batendo na lingota ===== */
+  /* ===== v30: CENA DA FORJA — o SVG novo traz o proprio CSS na secao
+     "v30 · CENA DA FORJA" abaixo. O bloco v29 foi removido: aqueles ids
+     (#forge-hammer, #forge-sparks...) nao existem mais no markup. ===== */
   .forge-wrap { position: relative; width: 250px; margin: 0 auto 4px; }
-  .forge-svg { display: block; width: 100%; height: auto;
-    filter: drop-shadow(0 18px 30px rgba(238,86,34,0.20)) drop-shadow(0 10px 20px rgba(14,17,22,0.14)); }
-  #forge-hammer { transform-origin: 199px 38px; animation: forgeStrike 1.9s cubic-bezier(.4,0,.3,1) infinite; }
-  @keyframes forgeStrike {
-    0%, 24% { transform: rotate(40deg); }
-    38%     { transform: rotate(52deg); }
-    46%     { transform: rotate(0deg); }
-    52%     { transform: rotate(7deg); }
-    100%    { transform: rotate(40deg); }
-  }
-  #forge-sparks { transform-origin: 128px 96px; animation: forgeSparks 1.9s ease-out infinite; opacity: 0; }
-  @keyframes forgeSparks {
-    0%, 44% { opacity: 0; transform: scale(0.3); }
-    50%     { opacity: 1; transform: scale(1); }
-    72%     { opacity: 0; transform: scale(1.5); }
-    100%    { opacity: 0; transform: scale(1.5); }
-  }
-  #forge-glow { animation: forgeGlow 1.9s ease-in-out infinite; }
-  @keyframes forgeGlow { 0%, 42%, 100% { opacity: 0.55; } 48% { opacity: 1; } 70% { opacity: 0.7; } }
-  #forge-hot { animation: forgeHot 1.9s ease-in-out infinite; }
-  @keyframes forgeHot { 0%, 42%, 100% { opacity: 0.35; } 48% { opacity: 0.95; } 70% { opacity: 0.5; } }
-  @media (prefers-reduced-motion: reduce) {
-    #forge-hammer, #forge-sparks, #forge-glow, #forge-hot { animation: none !important; }
-    #forge-sparks { opacity: 0.9; transform: scale(1); }
-  }
   .hero-title-wrap { position: relative; }
-  .hero-badge { display: inline-block; padding: 0.2rem 0.7rem; border: 1px solid #CDE9DA; color: var(--ok-ink); border-radius: 999px; letter-spacing: 0.2em; background: var(--ok-soft); }
+  .hero-badge { display: inline-block; padding: 0.2rem 0.7rem; border: 1px solid rgba(9,166,107,.5); color: var(--ok-ink); border-radius: 999px; letter-spacing: 0.2em; background: var(--ok-soft); }
 
   /* ===================================================================
      v29.2.0: FEED MOTIVACIONAL (tela de login, pre-auth)
@@ -542,11 +607,11 @@
   .feed-card {
     position: relative;
     display: inline-flex; align-items: center; gap: .55rem;
-    background: #FFFFFF;
+    background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: .45rem .85rem;
-    box-shadow: 0 1px 2px rgba(14,17,22,.05);
+    box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 12px 28px -20px #000;
   }
   .fc-emoji { line-height: 1; font-size: 1rem; }
   .fc-body { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.12; text-align: left; }
@@ -558,9 +623,9 @@
 
   /* tier MD - streak 3+ ou 4+ na semana: verde "feito", presenca media */
   .feed-card--md {
-    border-color: #BFE3CF;
-    background: linear-gradient(160deg, #FFFFFF 30%, var(--ok-soft));
-    box-shadow: 0 3px 10px -3px rgba(16,147,94,.28);
+    border-color: rgba(9,166,107,.55);
+    background: linear-gradient(160deg, var(--surface-2) 30%, rgba(9,166,107,.16));
+    box-shadow: 0 8px 22px -12px rgba(9,166,107,.55);
     padding: .55rem 1rem;
   }
   .feed-card--md .fc-emoji { font-size: 1.25rem; }
@@ -570,7 +635,7 @@
   /* tier LG - campeao do mes: brasa, o card mais quente da tela */
   .feed-card--lg {
     border: 1px solid var(--acc);
-    background: linear-gradient(160deg, #FFFFFF 25%, var(--acc-soft));
+    background: linear-gradient(160deg, var(--surface-2) 25%, rgba(232,86,22,.22));
     border-radius: 16px;
     padding: .7rem 1.25rem;
     animation: fc-ember 2.6s ease-in-out infinite;
@@ -589,7 +654,7 @@
     transform: rotate(7deg);
     font-family: 'JetBrains Mono', monospace; font-weight: 800;
     font-size: .5rem; letter-spacing: .1em;
-    color: var(--ok-ink); background: #FFFFFF;
+    color: var(--ok-ink); background: var(--surface-1);
     border: 1.5px solid currentColor; border-radius: 5px;
     padding: .08rem .3rem;
     box-shadow: 0 1px 3px rgba(14,17,22,.14);
@@ -597,68 +662,1414 @@
   .feed-card--lg .fc-stamp { color: var(--acc-ink); }
 
   /* ===================================================================
-     v29 OVERRIDE LAYER — remapeia as utilitarias Tailwind (compiladas
-     no bloco #tailwind-compiled com valores dark) para o tema claro.
-     Mesma especificidade, declarado depois => vence sem !important.
-     NAO sobrescrever: text-white, text-zinc-950, bg-zinc-100 e
-     bg-cyan-500 (papeis mistos — tratados caso a caso no markup/JS).
+     v30 OVERRIDE LAYER — remapeia as utilitarias Tailwind (compiladas no
+     bloco #tailwind-compiled) para o tema BRASA ESCURO. Mesma
+     especificidade, declarado depois => vence sem !important.
+     Substitui a camada v29 (que puxava tudo pro claro).
      =================================================================== */
-  .text-zinc-100 { color: #0E1116; }
-  .text-zinc-200 { color: #1B2430; }
-  .text-zinc-300 { color: #3A424E; }
-  .text-zinc-400, .text-zinc-500 { color: #5B6472; }
-  .text-zinc-600 { color: #8B93A0; }
-  .text-zinc-700 { color: #B3BAC4; }
-  .hover\:text-zinc-100:hover, .hover\:text-white:hover { color: #0E1116; }
-  .hover\:text-zinc-400:hover { color: #5B6472; }
-  .border-zinc-800, .border-zinc-900\/60 { border-color: #E7EAEE; }
-  .border-zinc-500, .border-zinc-600, .border-zinc-700 { border-color: #DCE0E6; }
-  .hover\:border-zinc-500:hover, .hover\:border-zinc-600:hover { border-color: #C6CBD3; }
-  .bg-zinc-950 { background-color: #F6F7F9; }
-  .bg-zinc-950\/95 { background-color: rgba(246,247,249,0.95); }
-  .bg-zinc-950\/70 { background-color: rgba(246,247,249,0.7); }
-  .bg-black\/80 { background-color: rgba(246,247,249,0.85); }
-  .bg-zinc-900 { background-color: #E7EAEE; }
-  .bg-zinc-900\/30 { background-color: #EFF1F4; }
-  .bg-zinc-900\/60, .hover\:bg-zinc-900\/60:hover { background-color: #EFF1F4; }
-  .bg-zinc-800 { background-color: #DCE0E6; }
-  .bg-zinc-600 { background-color: #8B93A0; }
-  .bg-zinc-400 { background-color: #C6CBD3; }
-  .text-cyan-300, .text-cyan-400, .hover\:text-cyan-400:hover { color: #B23A12; }
-  .border-cyan-500 { border-color: #EE5622; }
-  .border-cyan-600\/50, .border-cyan-600\/70, .border-cyan-700\/50 { border-color: rgba(238,86,34,0.45); }
-  .bg-cyan-500\/10 { background-color: #FDECE5; }
-  .ring-cyan-400 { --tw-ring-color: #EE5622; }
-  .ring-offset-zinc-950 { --tw-ring-offset-color: #F6F7F9; }
-  .text-emerald-400, .text-emerald-500, .hover\:text-emerald-400:hover { color: #0B6E46; }
-  .bg-emerald-500, .bg-emerald-600 { background-color: #10935E; }
-  .bg-emerald-700 { background-color: #0B8A55; }
-  .border-emerald-600, .border-emerald-700 { border-color: #0B8A55; }
-  .text-red-400, .text-red-500, .hover\:text-red-500:hover { color: #DC2626; }
-  .text-red-200 { color: #B42318; }
-  .bg-red-500 { background-color: #DC2626; }
-  .bg-red-900, .bg-red-900\/70 { background-color: #B42318; }
-  .border-red-700 { border-color: #8F1B12; }
-  .text-amber-400, .text-amber-500 { color: #C77400; }
-  .text-amber-400\/90, .text-amber-500\/80, .text-amber-500\/90 { color: rgba(199,116,0,0.95); }
-  .bg-amber-500 { background-color: #C77400; }
-  .text-violet-400 { color: #7C3AED; }
-  .bg-violet-500 { background-color: #7C3AED; }
-  /* ===== helpers novos v29 ===== */
+  .text-zinc-100 { color: #E9EDF3; }
+  .text-zinc-200 { color: #DCE2EA; }
+  .text-zinc-300 { color: #C3CBD6; }
+  .text-zinc-400, .text-zinc-500 { color: #98A2B1; }
+  .text-zinc-600 { color: #7C8797; }
+  .text-zinc-700 { color: #6B7686; }
+  .hover\:text-zinc-100:hover, .hover\:text-white:hover { color: #FFFFFF; }
+  .hover\:text-zinc-400:hover { color: #98A2B1; }
+  .hover\:text-zinc-500:hover { color: #98A2B1; }
+  .border-zinc-800, .border-zinc-900\/60 { border-color: #242C38; }
+  .border-zinc-500, .border-zinc-600, .border-zinc-700 { border-color: #323C4B; }
+  .hover\:border-zinc-500:hover, .hover\:border-zinc-600:hover { border-color: #46536A; }
+  .bg-zinc-950 { background-color: #0B0E13; }
+  .bg-zinc-950\/95 { background-color: rgba(11,14,19,0.95); }
+  .bg-zinc-950\/70 { background-color: rgba(11,14,19,0.7); }
+  .bg-black\/80 { background-color: rgba(5,7,10,0.85); }
+  .bg-zinc-900 { background-color: #171E28; }
+  .bg-zinc-900\/30 { background-color: rgba(23,30,40,0.5); }
+  .bg-zinc-900\/60, .hover\:bg-zinc-900\/60:hover { background-color: #12171F; }
+  .bg-zinc-800 { background-color: #1D2531; }
+  .bg-zinc-600 { background-color: #4A5462; }
+  .bg-zinc-400 { background-color: #6B7686; }
+  .bg-zinc-100 { background-color: #1D2531; }
+  .text-zinc-950 { color: #E9EDF3; }
+  /* ciano do tema antigo = brasa */
+  .text-cyan-300, .text-cyan-400, .hover\:text-cyan-400:hover { color: #FF7645; }
+  .border-cyan-500 { border-color: #E85616; }
+  .border-cyan-600\/50, .border-cyan-600\/70, .border-cyan-700\/50 { border-color: rgba(232,86,22,0.5); }
+  .bg-cyan-500\/10 { background-color: rgba(232,86,22,0.14); }
+  .bg-cyan-500 { background-color: #E85616; }
+  .ring-cyan-400 { --tw-ring-color: #E85616; }
+  .ring-offset-zinc-950 { --tw-ring-offset-color: #0B0E13; }
+  .text-emerald-400, .text-emerald-500, .hover\:text-emerald-400:hover { color: #3FD9A0; }
+  .bg-emerald-500, .bg-emerald-600 { background-color: #09A66B; }
+  .bg-emerald-700 { background-color: #067A4E; }
+  .border-emerald-600, .border-emerald-700 { border-color: #09A66B; }
+  .text-red-400, .text-red-500, .hover\:text-red-500:hover { color: #EB4D45; }
+  .text-red-200 { color: #F5938D; }
+  .bg-red-500 { background-color: #EB4D45; }
+  .bg-red-900, .bg-red-900\/70 { background-color: #5B1A16; }
+  .border-red-700 { border-color: #8F2A24; }
+  .text-amber-400, .text-amber-500 { color: #E0A33A; }
+  .text-amber-400\/90, .text-amber-500\/80, .text-amber-500\/90 { color: rgba(224,163,58,0.95); }
+  .bg-amber-500 { background-color: #BE7C05; }
+  .text-violet-400 { color: #9276E2; }
+  .bg-violet-500 { background-color: #9276E2; }
+  /* ===== helpers ===== */
   .bg-steel { background-color: #1B2430; }
-  .day-tx-a { color: #DC2626; } .day-bg-a { background-color: #DC2626; }
-  .day-tx-b { color: #C77400; } .day-bg-b { background-color: #C77400; }
-  .day-tx-c { color: #0B8A55; } .day-bg-c { background-color: #0B8A55; }
-  .day-tx-d { color: #0E7490; } .day-bg-d { background-color: #0E7490; }
-  .day-tx-e { color: #7C3AED; } .day-bg-e { background-color: #7C3AED; }
-  .toast-info { background: #FFFFFF; border-color: #DCE0E6; color: #3A424E; }
-  .toast-ok { background: #E4F4EC; border-color: #CDE9DA; color: #0B6E46; }
-  .toast-err { background: #FDE8E8; border-color: #F3C6C6; color: #B42318; }
-  .cal-falta { background: #FBEAEA; color: #B42318; }
+  .day-tx-a { color: #EB4D45; } .day-bg-a { background-color: #EB4D45; }
+  .day-tx-b { color: #E0A33A; } .day-bg-b { background-color: #BE7C05; }
+  .day-tx-c { color: #3FD9A0; } .day-bg-c { background-color: #09A66B; }
+  .day-tx-d { color: #35B4E0; } .day-bg-d { background-color: #0598CE; }
+  .day-tx-e { color: #A78BFA; } .day-bg-e { background-color: #9276E2; }
+  .toast-info { background: #1D2531; border-color: #323C4B; color: #E9EDF3; }
+  .toast-ok { background: rgba(9,166,107,.16); border-color: #09A66B; color: #3FD9A0; }
+  .toast-err { background: rgba(235,77,69,.16); border-color: #EB4D45; color: #F5938D; }
+  .cal-falta { background: rgba(235,77,69,.18); color: #F5938D; }
+
+
+/* ============ v30 · CENA DA FORJA ============ */
+/* ===== FORJA - hero: cena da forja (prefixo hero-) ===================== */
+/* Ciclo mestre 2s. O impacto cai SEMPRE em 30% do ciclo: martelo, clarao,
+   anel de choque, faiscas e o pulso do brilho ambiente usam essa marca.
+   Brasa 4s, fumaca 6s (multiplos de 2s, nunca saem de fase). A fornalha
+   corre em 3s/1.7s de proposito: e outra fonte, nao pode bater junto. */
+
+.hero-forge{display:block;width:100%;max-width:260px;margin:0 auto;line-height:0;pointer-events:none}
+.hero-svg{display:block;width:100%;height:auto}
+
+/* --- martelo: antecipacao, golpe acelerado, quique, volta lenta --------- */
+/* pivo 238,44 = punho. Angulo maximo 16.4deg: nesse extremo o canto do
+   martelo para em y=2.9 do viewBox, ou seja, nao corta na borda de cima. */
+.hero-hammer{transform-box:view-box;transform-origin:238px 44px;animation:hero-swing 2s infinite;will-change:transform}
+@keyframes hero-swing{
+  0%  {transform:rotate(13deg);  animation-timing-function:cubic-bezier(.35,0,.5,1)}
+  11% {transform:rotate(16.4deg);animation-timing-function:cubic-bezier(.4,0,.6,1)}   /* antecipacao */
+  17% {transform:rotate(15.3deg);animation-timing-function:cubic-bezier(.6,0,.95,.4)} /* respiro */
+  30% {transform:rotate(0deg);   animation-timing-function:cubic-bezier(.1,.75,.35,1)}/* IMPACTO */
+  35% {transform:rotate(4.1deg); animation-timing-function:cubic-bezier(.45,0,.6,1)}  /* quique */
+  41% {transform:rotate(2.6deg); animation-timing-function:cubic-bezier(.3,.05,.4,1)}
+  72% {transform:rotate(11.7deg);animation-timing-function:ease-in-out}
+  100%{transform:rotate(13deg)}
+}
+
+/* --- clarao do impacto -------------------------------------------------- */
+.hero-flash{transform-box:fill-box;transform-origin:50% 50%;opacity:0;animation:hero-flash 2s infinite}
+.hero-flash-b{animation-name:hero-flashb}
+@keyframes hero-flash{
+  0%,28%  {opacity:0;transform:scale(.4)}
+  31%     {opacity:.92;transform:scale(1)}
+  44%     {opacity:.22;transform:scale(1.45)}
+  62%,100%{opacity:0;transform:scale(1.8)}
+}
+@keyframes hero-flashb{
+  0%,29%{opacity:0;transform:scale(.3)}
+  31%   {opacity:.8;transform:scale(1)}
+  43%   {opacity:0;transform:scale(1.6)}
+  100%  {opacity:0;transform:scale(.3)}
+}
+
+/* --- anel de choque na face da bigorna ---------------------------------- */
+.hero-ring{transform-box:fill-box;transform-origin:50% 50%;opacity:0;animation:hero-ring 2s infinite}
+@keyframes hero-ring{
+  0%,29%  {opacity:0;transform:scale(.5)}
+  32%     {opacity:.8;transform:scale(1);animation-timing-function:cubic-bezier(.1,.7,.3,1)}
+  60%,100%{opacity:0;transform:scale(3.1)}
+}
+
+/* --- brilho ambiente e peca: respiram no ritmo do golpe ------------------ */
+.hero-breathe{transform-box:fill-box;transform-origin:50% 50%;animation:hero-breathe 2s ease-in-out infinite}
+@keyframes hero-breathe{
+  0%,26%{opacity:.52;transform:scale(1)}
+  31%   {opacity:.94;transform:scale(1.07)}
+  56%   {opacity:.66;transform:scale(1.02)}
+  100%  {opacity:.52;transform:scale(1)}
+}
+.hero-ingot{animation:hero-hot 2s ease-in-out infinite}
+@keyframes hero-hot{0%,26%{opacity:.9}31%{opacity:1}62%{opacity:.93}100%{opacity:.9}}
+
+/* --- faiscas: X linear no <g>, Y parabolico no filho => trajetoria real -- */
+.hero-spk-a{animation:hero-flyxa 2s linear infinite}
+.hero-spk-b{animation:hero-flyxb 2s linear infinite}
+.hero-spk-c{animation:hero-flyxc 2s linear infinite}
+@keyframes hero-flyxa{0%,30%{transform:translateX(0)}55%,100%{transform:translateX(var(--hero-dx,26px))}}
+@keyframes hero-flyxb{0%,30%{transform:translateX(0)}66%,100%{transform:translateX(var(--hero-dx,40px))}}
+@keyframes hero-flyxc{0%,30%{transform:translateX(0)}78%,100%{transform:translateX(var(--hero-dx,58px))}}
+
+.hero-sy{transform-box:fill-box;transform-origin:50% 50%;opacity:0}
+.hero-sy-a{animation:hero-arca 2s infinite}
+.hero-sy-b{animation:hero-arcb 2s infinite}
+.hero-sy-c{animation:hero-arcc 2s infinite}
+@keyframes hero-arca{
+  0%,29%  {transform:translateY(0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.15,.6,.4,1)}
+  32%     {opacity:1}
+  40%     {transform:translateY(var(--hero-up,-20px)) scale(.92);animation-timing-function:cubic-bezier(.55,.05,.85,.5)}
+  55%,100%{transform:translateY(var(--hero-dn,12px)) scale(.4);opacity:0}
+}
+@keyframes hero-arcb{
+  0%,29%  {transform:translateY(0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.15,.6,.4,1)}
+  32%     {opacity:1}
+  44%     {transform:translateY(var(--hero-up,-18px)) scale(.9);animation-timing-function:cubic-bezier(.55,.05,.85,.5)}
+  66%,100%{transform:translateY(var(--hero-dn,24px)) scale(.4);opacity:0}
+}
+@keyframes hero-arcc{
+  0%,29%  {transform:translateY(0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.15,.6,.4,1)}
+  33%     {opacity:1}
+  48%     {transform:translateY(var(--hero-up,-12px)) scale(.88);animation-timing-function:cubic-bezier(.55,.05,.85,.5)}
+  78%,100%{transform:translateY(var(--hero-dn,30px)) scale(.35);opacity:0}
+}
+
+/* --- brasas subindo devagar (2 ciclos do martelo) ------------------------ */
+.hero-ember{transform-box:fill-box;transform-origin:50% 50%;opacity:0;animation:hero-ember 4s ease-out infinite}
+@keyframes hero-ember{
+  0%  {transform:translate(0,0) scale(1);opacity:0}
+  12% {opacity:.9}
+  68% {opacity:.34}
+  100%{transform:translate(var(--hero-ex,6px),var(--hero-ey,-54px)) scale(.3);opacity:0}
+}
+
+/* --- fumaca do cepo e da coifa ------------------------------------------ */
+.hero-smoke{transform-box:fill-box;transform-origin:50% 100%;opacity:0;animation:hero-smoke 6s linear infinite}
+@keyframes hero-smoke{
+  0%  {transform:translate(0,0) scale(.55);opacity:0}
+  22% {opacity:.5}
+  100%{transform:translate(var(--hero-sx,8px),var(--hero-sy2,-60px)) scale(1.9);opacity:0}
+}
+
+/* --- ondas de calor ----------------------------------------------------- */
+.hero-heat{transform-box:fill-box;transform-origin:50% 100%;opacity:0;animation:hero-heat 2s linear infinite}
+@keyframes hero-heat{
+  0%  {transform:translateY(6px) scaleX(1);opacity:0}
+  30% {opacity:.45}
+  100%{transform:translateY(-26px) scaleX(1.3);opacity:0}
+}
+
+/* --- fornalha: outra fonte de luz, ritmo proprio ------------------------- */
+.hero-fire{animation:hero-fire 3s ease-in-out infinite}
+@keyframes hero-fire{0%,100%{opacity:.86}22%{opacity:1}47%{opacity:.76}70%{opacity:.95}}
+.hero-flame{transform-box:fill-box;transform-origin:50% 100%;animation:hero-flame 1.7s ease-in-out infinite}
+@keyframes hero-flame{
+  0%,100%{transform:scale(1,1);opacity:.9}
+  28%    {transform:scale(.94,1.18);opacity:1}
+  55%    {transform:scale(1.06,.9);opacity:.78}
+  80%    {transform:scale(.97,1.1);opacity:.95}
+}
+
+/* --- quadro parado: sem movimento, cena continua legivel ----------------- */
+@media (prefers-reduced-motion:reduce){
+  .hero-forge *{animation:none!important;transition:none!important}
+  .hero-hammer{transform:rotate(14deg)}
+  .hero-flash,.hero-ring,.hero-sy{opacity:0}
+  .hero-breathe{opacity:.66}
+  .hero-ingot,.hero-fire{opacity:1}
+  .hero-ember{opacity:.5}
+  .hero-e2{transform:translate(4px,-20px) scale(.8);opacity:.4}
+  .hero-e3{transform:translate(-6px,-38px) scale(.6);opacity:.26}
+  .hero-e4{transform:translate(9px,-12px) scale(.9);opacity:.46}
+  .hero-f2{transform:translate(3px,-26px) scale(.7);opacity:.3}
+  .hero-smoke{opacity:.16}
+  .hero-sm2{transform:translate(6px,-24px) scale(1.3);opacity:.1}
+  .hero-sm3{transform:translate(-4px,-40px) scale(1.6);opacity:.06}
+  .hero-sm4{transform:translate(4px,-30px) scale(1.5);opacity:.09}
+  .hero-heat{opacity:.3}
+  .hero-hw2{transform:translateY(-12px);opacity:.18}
+  .hero-hw3{transform:translateY(-20px);opacity:.1}
+}
+
+/* ============ v30 · TEXTURAS E MATERIAIS ============ */
+/* ============================================================
+   BRASA ESCURO - BIBLIOTECA DE MATERIAIS (prefixo fx-)
+   Tudo CSS/SVG inline: zero imagem, zero lib, zero fetch.
+   ============================================================ */
+
+/* --- tokens: apague este bloco se o app ja declara --- */
+
+
+/* --- multiplicador global de intensidade (herda pra dentro) ---
+   NAO declare --fx-i:1 em lugar nenhum: todo uso e var(--fx-i,1),
+   entao o padrao ja e 1 e estas duas classes nunca perdem a cascata. */
+.fx-suave{--fx-i:.55}
+.fx-forte{--fx-i:1.7}
+
+/* ============================================================
+   1. fx-aco-escovado - aco escovado (cabecalhos, barras)
+   ============================================================ */
+.fx-aco-escovado{
+  --fx-risca:.034;
+  --fx-risca-esc:.055;
+  --fx-varredura:.075;
+  background-color:var(--surface-2);
+  background-image:
+    linear-gradient(101deg,
+      rgba(233,237,243,0) 24%,
+      rgba(233,237,243,calc(var(--fx-varredura) * var(--fx-i,1) * .45)) 41%,
+      rgba(233,237,243,calc(var(--fx-varredura) * var(--fx-i,1))) 49%,
+      rgba(233,237,243,calc(var(--fx-varredura) * var(--fx-i,1) * .32)) 57%,
+      rgba(233,237,243,0) 76%),
+    repeating-linear-gradient(90deg,
+      rgba(233,237,243,calc(var(--fx-risca) * var(--fx-i,1))) 0 1px,
+      rgba(11,14,19,0) 1px 2px,
+      rgba(11,14,19,calc(var(--fx-risca-esc) * var(--fx-i,1))) 2px 3px,
+      rgba(233,237,243,calc(var(--fx-risca) * var(--fx-i,1) * .4)) 3px 4px,
+      rgba(11,14,19,0) 4px 6px),
+    linear-gradient(180deg,var(--surface-2) 0%,var(--surface-1) 54%,var(--bg) 100%);
+}
+.fx-aco-escovado--suave{--fx-risca:.016;--fx-risca-esc:.028;--fx-varredura:.038}
+.fx-aco-escovado--forte{--fx-risca:.06;--fx-risca-esc:.1;--fx-varredura:.12}
+
+/* ============================================================
+   2. fx-chapa - chapa xadrez / piso de oficina
+   ============================================================ */
+.fx-chapa{
+  --fx-chapa-luz:.055;
+  --fx-chapa-sombra:.42;
+  --fx-chapa-t:20px;
+  background-color:var(--surface-1);
+  background-image:
+    linear-gradient(180deg,rgba(233,237,243,.02) 0%,rgba(11,14,19,.16) 100%),
+    repeating-linear-gradient(45deg,
+      rgba(233,237,243,calc(var(--fx-chapa-luz) * var(--fx-i,1))) 0 1.5px,
+      rgba(11,14,19,calc(var(--fx-chapa-sombra) * var(--fx-i,1))) 1.5px 3px,
+      rgba(11,14,19,0) 3px 10px),
+    repeating-linear-gradient(-45deg,
+      rgba(233,237,243,calc(var(--fx-chapa-luz) * var(--fx-i,1))) 0 1.5px,
+      rgba(11,14,19,calc(var(--fx-chapa-sombra) * var(--fx-i,1))) 1.5px 3px,
+      rgba(11,14,19,0) 3px 10px);
+  background-size:auto,var(--fx-chapa-t) var(--fx-chapa-t),var(--fx-chapa-t) var(--fx-chapa-t);
+  background-position:0 0,0 0,calc(var(--fx-chapa-t) / 2) calc(var(--fx-chapa-t) / 2);
+}
+.fx-chapa--suave{--fx-chapa-luz:.028;--fx-chapa-sombra:.22}
+.fx-chapa--forte{--fx-chapa-luz:.09;--fx-chapa-sombra:.62;--fx-chapa-t:24px}
+
+/* ============================================================
+   3. fx-carvao - grao de carvao/fuligem (feTurbulence em data-URI)
+   ============================================================ */
+.fx-carvao{position:relative}
+.fx-carvao::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  opacity:calc(.07 * var(--fx-i,1));
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3E%3Cfilter id='fx-carvao-grao' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23fx-carvao-grao)'/%3E%3C/svg%3E");
+  background-size:128px 128px;
+}
+.fx-carvao--suave::after{opacity:calc(.035 * var(--fx-i,1))}
+.fx-carvao--forte::after{opacity:calc(.15 * var(--fx-i,1))}
+
+/* ============================================================
+   4. fx-brasa - halo de calor por tras da peca
+   SEM isolation: o ::before precisa cair ATRAS do fundo do
+   proprio elemento pro calor vazar so pelas bordas.
+   ============================================================ */
+.fx-brasa{position:relative}
+.fx-brasa::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:-14%;
+  width:126%;
+  height:86%;
+  transform:translateX(-50%);
+  z-index:-1;
+  pointer-events:none;
+  border-radius:inherit;
+  background:radial-gradient(58% 100% at 50% 100%,
+    rgba(255,138,76,calc(.20 * var(--fx-i,1))) 0%,
+    rgba(232,86,22,calc(.13 * var(--fx-i,1))) 32%,
+    rgba(151,49,1,calc(.07 * var(--fx-i,1))) 58%,
+    rgba(151,49,1,0) 78%);
+}
+.fx-brasa--suave::before{background:radial-gradient(58% 100% at 50% 100%,rgba(255,138,76,calc(.11 * var(--fx-i,1))) 0%,rgba(232,86,22,calc(.06 * var(--fx-i,1))) 36%,rgba(151,49,1,0) 74%)}
+.fx-brasa--forte::before{
+  height:120%;
+  bottom:-24%;
+  width:140%;
+  background:radial-gradient(62% 100% at 50% 100%,
+    rgba(255,138,76,calc(.42 * var(--fx-i,1))) 0%,
+    rgba(255,118,69,calc(.26 * var(--fx-i,1))) 24%,
+    rgba(232,86,22,calc(.15 * var(--fx-i,1))) 48%,
+    rgba(151,49,1,calc(.07 * var(--fx-i,1))) 68%,
+    rgba(151,49,1,0) 84%);
+}
+/* brasa respirando - anima SO opacidade (composita, nao repinta) */
+.fx-brasa--pulsa::before{animation:fx-pulso 4.6s ease-in-out infinite}
+@keyframes fx-pulso{0%,100%{opacity:.72}50%{opacity:1}}
+
+/* ============================================================
+   5. fx-bisel - relevo de placa de metal (so box-shadow)
+   ============================================================ */
+.fx-bisel{
+  border-radius:16px;
+  background-color:var(--surface-1);
+  border:1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 rgba(233,237,243,calc(.10 * var(--fx-i,1))),
+    inset 0 -14px 20px -16px rgba(11,14,19,calc(.92 * var(--fx-i,1))),
+    0 10px 20px -12px rgba(11,14,19,calc(.8 * var(--fx-i,1)));
+}
+.fx-bisel--suave{
+  box-shadow:
+    inset 0 1px 0 rgba(233,237,243,.055),
+    0 4px 10px -8px rgba(11,14,19,.7);
+}
+.fx-bisel--forte{
+  border-color:var(--line-hot);
+  box-shadow:
+    inset 0 1px 0 rgba(233,237,243,.17),
+    inset 0 -18px 26px -18px rgba(11,14,19,.95),
+    0 14px 26px -12px rgba(11,14,19,.85);
+}
+.fx-bisel--brasa{
+  border-color:var(--line-hot);
+  box-shadow:
+    inset 0 1px 0 rgba(255,138,76,.34),
+    inset 0 -16px 24px -18px rgba(11,14,19,.92),
+    0 0 0 1px rgba(151,49,1,.32),
+    0 12px 24px -12px rgba(11,14,19,.85);
+}
+
+/* ============================================================
+   6. fx-vidro - vidro fosco sobre metal
+   ============================================================ */
+.fx-vidro{
+  background-color:rgba(18,23,31,.72);
+  border-bottom:1px solid var(--line);
+  -webkit-backdrop-filter:blur(14px) saturate(125%);
+  backdrop-filter:blur(14px) saturate(125%);
+  box-shadow:inset 0 1px 0 rgba(233,237,243,.07);
+}
+.fx-vidro--suave{
+  background-color:rgba(18,23,31,.58);
+  -webkit-backdrop-filter:blur(8px) saturate(115%);
+  backdrop-filter:blur(8px) saturate(115%);
+}
+.fx-vidro--forte{
+  background-color:rgba(11,14,19,.8);
+  -webkit-backdrop-filter:blur(22px) saturate(135%);
+  backdrop-filter:blur(22px) saturate(135%);
+}
+@supports not ((-webkit-backdrop-filter:blur(2px)) or (backdrop-filter:blur(2px))){
+  .fx-vidro,.fx-vidro--suave,.fx-vidro--forte{background-color:rgba(18,23,31,.97)}
+}
+
+/* ============================================================
+   7. fx-solda - filete de solda que separa secoes
+   ============================================================ */
+.fx-solda{
+  display:block;
+  width:100%;
+  height:1px;
+  margin:0;
+  border:0;
+  background:linear-gradient(90deg,
+    rgba(151,49,1,0) 0%,
+    #973101 14%,
+    #C54302 34%,
+    #E85616 46%,
+    #FF8A4C 50%,
+    #E85616 54%,
+    #C54302 66%,
+    #973101 86%,
+    rgba(151,49,1,0) 100%);
+  opacity:calc(.85 * var(--fx-i,1));
+}
+.fx-solda--suave{
+  background:linear-gradient(90deg,rgba(36,44,56,0) 0%,var(--line-hot) 26%,#C54302 50%,var(--line-hot) 74%,rgba(36,44,56,0) 100%);
+  opacity:calc(.7 * var(--fx-i,1));
+}
+.fx-solda--forte{
+  height:2px;
+  box-shadow:0 0 10px rgba(255,118,69,calc(.35 * var(--fx-i,1)));
+}
+.fx-solda--vertical{
+  width:1px;
+  flex:0 0 1px;
+  align-self:stretch;
+  height:auto;
+  background:linear-gradient(180deg,rgba(151,49,1,0) 0%,#973101 16%,#E85616 50%,#973101 84%,rgba(151,49,1,0) 100%);
+}
+
+/* ============================================================
+   8. fx-faisca - faiscas subindo
+   ============================================================ */
+.fx-faisca{position:relative}
+.fx-faisca__campo{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  border-radius:inherit;
+  pointer-events:none;
+}
+.fx-faisca__conteudo{position:relative;z-index:1}
+.fx-faisca__p{
+  position:absolute;
+  bottom:-6px;
+  left:var(--fx-x,50%);
+  width:2px;
+  height:2px;
+  border-radius:999px;
+  background:#FF8A4C;
+  box-shadow:0 0 6px rgba(255,118,69,.65);
+  opacity:0;
+  will-change:transform,opacity;
+  animation:fx-subir var(--fx-dur,4.4s) linear var(--fx-delay,0s) infinite;
+}
+@keyframes fx-subir{
+  0%{transform:translate3d(0,0,0) scale(.6);opacity:0}
+  10%{opacity:calc(.95 * var(--fx-i,1))}
+  55%{opacity:calc(.55 * var(--fx-i,1))}
+  100%{transform:translate3d(var(--fx-drift,6px),var(--fx-sobe,-130px),0) scale(.25);opacity:0}
+}
+.fx-faisca--suave .fx-faisca__p:nth-child(2n){display:none}
+.fx-faisca--forte .fx-faisca__p{width:3px;height:3px;box-shadow:0 0 9px rgba(255,118,69,.8)}
+.fx-pausado .fx-faisca__p{animation-play-state:paused}
+
+/* ============================================================
+   9. fx-rebite - rebites nos cantos
+   ============================================================ */
+.fx-rebite{position:relative}
+.fx-rebite::before{
+  content:"";
+  --fx-reb:8px;
+  --fx-reb-m:8px;
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  opacity:calc(1 * var(--fx-i,1));
+  background-image:
+    radial-gradient(circle at 36% 30%,rgba(233,237,243,.32) 0 14%,var(--line-hot) 34%,var(--line) 54%,var(--bg) 74%,rgba(11,14,19,.55) 80%,rgba(11,14,19,0) 84%),
+    radial-gradient(circle at 36% 30%,rgba(233,237,243,.32) 0 14%,var(--line-hot) 34%,var(--line) 54%,var(--bg) 74%,rgba(11,14,19,.55) 80%,rgba(11,14,19,0) 84%),
+    radial-gradient(circle at 36% 30%,rgba(233,237,243,.32) 0 14%,var(--line-hot) 34%,var(--line) 54%,var(--bg) 74%,rgba(11,14,19,.55) 80%,rgba(11,14,19,0) 84%),
+    radial-gradient(circle at 36% 30%,rgba(233,237,243,.32) 0 14%,var(--line-hot) 34%,var(--line) 54%,var(--bg) 74%,rgba(11,14,19,.55) 80%,rgba(11,14,19,0) 84%);
+  background-repeat:no-repeat;
+  background-size:var(--fx-reb) var(--fx-reb);
+  background-position:
+    left var(--fx-reb-m) top var(--fx-reb-m),
+    right var(--fx-reb-m) top var(--fx-reb-m),
+    left var(--fx-reb-m) bottom var(--fx-reb-m),
+    right var(--fx-reb-m) bottom var(--fx-reb-m);
+}
+.fx-rebite--suave::before{--fx-reb:6px;opacity:calc(.6 * var(--fx-i,1))}
+.fx-rebite--forte::before{--fx-reb:11px;--fx-reb-m:10px}
+.fx-rebite--topo::before{background-position:left var(--fx-reb-m) top var(--fx-reb-m),right var(--fx-reb-m) top var(--fx-reb-m),-99px -99px,-99px -99px}
+
+/* ============================================================
+   10. fx-perfurada - chapa perfurada / tela de alto-falante
+   ============================================================ */
+.fx-perfurada{
+  --fx-furo:9px;
+  background-color:var(--surface-1);
+  background-image:radial-gradient(circle at 50% 50%,
+    rgba(11,14,19,calc(.85 * var(--fx-i,1))) 0 1.5px,
+    rgba(233,237,243,calc(.06 * var(--fx-i,1))) 1.6px 2.3px,
+    rgba(11,14,19,0) 2.4px);
+  background-size:var(--fx-furo) var(--fx-furo);
+}
+.fx-perfurada--suave{--fx-furo:12px}
+.fx-perfurada--forte{--fx-furo:7px}
+
+/* ============================================================
+   11. fx-alerta - hachura de aviso
+   ============================================================ */
+.fx-alerta{
+  --fx-alerta-cor:rgba(190,124,5,.85);
+  --fx-alerta-t:9px;
+  background-color:var(--bg);
+  background-image:repeating-linear-gradient(45deg,
+    var(--fx-alerta-cor) 0 var(--fx-alerta-t),
+    rgba(11,14,19,.92) var(--fx-alerta-t) calc(var(--fx-alerta-t) * 2));
+  box-shadow:inset 0 1px 0 rgba(233,237,243,.06),inset 0 -1px 0 rgba(11,14,19,.7);
+}
+.fx-alerta--suave{--fx-alerta-cor:rgba(190,124,5,.4);--fx-alerta-t:11px}
+.fx-alerta--forte{--fx-alerta-cor:rgba(190,124,5,1);--fx-alerta-t:8px}
+.fx-alerta--falta{--fx-alerta-cor:rgba(235,77,69,.8)}
+.fx-alerta--brasa{--fx-alerta-cor:rgba(232,86,22,.85)}
+
+/* ============================================================
+   12. fx-vinco - sulco gravado no metal
+   ============================================================ */
+.fx-vinco{
+  border-radius:11px;
+  background-color:rgba(11,14,19,calc(.45 * var(--fx-i,1)));
+  box-shadow:
+    inset 0 2px 3px rgba(11,14,19,calc(.8 * var(--fx-i,1))),
+    inset 0 -1px 0 rgba(233,237,243,calc(.06 * var(--fx-i,1))),
+    0 1px 0 rgba(233,237,243,calc(.045 * var(--fx-i,1)));
+}
+.fx-vinco--suave{background-color:rgba(11,14,19,.24);box-shadow:inset 0 1px 2px rgba(11,14,19,.5),0 1px 0 rgba(233,237,243,.035)}
+.fx-vinco--forte{background-color:rgba(11,14,19,.72);box-shadow:inset 0 3px 5px rgba(11,14,19,.95),inset 0 -1px 0 rgba(233,237,243,.09),0 1px 0 rgba(233,237,243,.06)}
+
+/* ============================================================
+   UTILITARIOS
+   ============================================================ */
+.fx-mono{font-family:var(--fx-mono);font-size:11px;letter-spacing:.04em;color:var(--text-dim)}
+.fx-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.fx-sem-anim .fx-faisca__p{animation:none;opacity:calc(.3 * var(--fx-i,1))}
+.fx-sem-anim .fx-brasa--pulsa::before{animation:none}
+.fx-sem-anim .fx-emb__calor{animation:none}
+
+/* ============================================================
+   BLOCO DE DEMONSTRACAO
+   ============================================================ */
+.fx-kit{
+  width:100%;
+  max-width:390px;
+  margin:0 auto;
+  padding-bottom:22px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--fx-corpo);
+  overflow:hidden;
+}
+.fx-kit *,.fx-kit *::before,.fx-kit *::after{box-sizing:border-box}
+.fx-kit figure{margin:0}
+.fx-kit p{margin:0}
+
+.fx-kit__head{padding:18px 16px 20px}
+.fx-kit__kicker{font:400 10px/1 var(--fx-mono);letter-spacing:.24em;color:var(--brasa-4)}
+.fx-kit__titulo{margin:4px 0 0;font-family:var(--fx-display);font-size:32px;line-height:.95;letter-spacing:.02em;color:var(--text)}
+.fx-kit__sub{margin-top:8px;font:400 11px/1.5 var(--fx-mono);color:var(--text-dim)}
+
+.fx-ctrl{display:flex;gap:6px;padding:14px 16px 0}
+.fx-ctrl__b,.fx-ctrl__anim{
+  min-height:44px;
+  border-radius:11px;
+  border:1px solid var(--line);
+  background:var(--surface-1);
+  color:var(--text-dim);
+  font:400 11px/1 var(--fx-mono);
+  letter-spacing:.1em;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.fx-ctrl__b{flex:1}
+.fx-ctrl__b.fx-is-on{color:var(--text);border-color:var(--line-hot);background:var(--surface-2);box-shadow:inset 0 1px 0 rgba(255,138,76,.3)}
+.fx-ctrl__anim{display:block;width:calc(100% - 32px);margin:8px 16px 0}
+.fx-ctrl__b:focus-visible,.fx-ctrl__anim:focus-visible{outline:2px solid var(--brasa-4);outline-offset:2px}
+
+/* hero + emblema desenhado */
+.fx-hero{margin:16px 16px 0;padding:16px;min-height:120px}
+.fx-hero__linha{display:flex;align-items:center;gap:10px}
+.fx-hero__txt{flex:1;min-width:0}
+.fx-hero__eyebrow{font:400 10px/1 var(--fx-mono);letter-spacing:.2em;color:var(--brasa-4)}
+.fx-hero__t{margin-top:6px;font-family:var(--fx-display);font-size:40px;line-height:.9;letter-spacing:.02em;color:var(--text)}
+.fx-hero__n{margin-top:8px;font:400 11px/1.5 var(--fx-mono);color:var(--text-dim)}
+.fx-emb{display:block;width:84px;height:64px;flex:0 0 84px}
+.fx-emb__calor{animation:fx-emb-brilho 5.4s ease-in-out infinite;transform-origin:center}
+@keyframes fx-emb-brilho{0%,100%{opacity:.6}50%{opacity:1}}
+
+.fx-secao{margin:24px 16px 0;font:400 10px/1 var(--fx-mono);letter-spacing:.2em;color:var(--text-dim)}
+.fx-secao__nota{margin:6px 16px 0;font:400 11px/1.45 var(--fx-corpo);color:var(--text-dim)}
+
+/* grade de amostras */
+.fx-grade{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 10px;padding:12px 16px 0}
+.fx-sw__amostra{
+  position:relative;
+  height:96px;
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.fx-sup{background-color:var(--surface-1);border:1px solid var(--line)}
+.fx-sw__amostra--aberto{overflow:visible;background:none;border:0}
+.fx-sw__amostra--pilha{flex-direction:column;gap:16px;padding:0 12px}
+.fx-sw__nucleo{width:78px;height:54px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line-hot)}
+.fx-sw__cap{display:block;margin-top:7px}
+.fx-sw__id{display:flex;align-items:center;gap:6px}
+.fx-ic{display:block;width:15px;height:15px;flex:0 0 15px;color:var(--text-dim)}
+.fx-sw__nome{font-family:var(--fx-mono);font-size:11px;letter-spacing:.01em;color:var(--text);overflow-wrap:anywhere}
+.fx-sw__custo{display:flex;align-items:center;gap:5px;margin-top:5px;font:400 10px/1 var(--fx-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.fx-med{display:inline-flex;gap:2px}
+.fx-med i{display:block;width:4px;height:10px;border-radius:999px;background:var(--vazio)}
+/* magnitude usa a rampa brasa, nunca status verde/vermelho.
+   #973101 fica em 2,5:1 sobre o fundo, entao a rampa comeca em #C54302. */
+.fx-med--1 i:nth-child(1){background:#C54302}
+.fx-med--2 i:nth-child(-n+2){background:#E85616}
+.fx-med--3 i{background:#FF7645}
+
+.fx-sw__barra{position:absolute;left:0;right:0;top:32px;height:32px;display:flex;align-items:center;padding:0 10px}
+.fx-sw__faixa{display:block;width:100%;height:22px;border-radius:11px}
+.fx-sw__chip{padding:8px 12px;font:400 11px/1 var(--fx-mono);letter-spacing:.06em;color:var(--text)}
+.fx-sw__fundo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+
+/* ------------------------------------------------------------
+   GRAFICO: custo de pintura por material
+   1 serie, escala ordinal unica, sem legenda (o titulo nomeia)
+   ------------------------------------------------------------ */
+.fx-cg{position:relative;margin:12px 16px 0}
+.fx-cg__svg{display:block;width:100%;height:auto}
+.fx-cg__grade{stroke:var(--line);stroke-width:1;shape-rendering:crispEdges}
+.fx-cg__base{stroke:var(--line-hot);stroke-width:1;shape-rendering:crispEdges}
+.fx-cg__trilho{fill:var(--vazio);opacity:.4}
+.fx-cg__barra{fill:url(#fx-g-barra);stroke:none}
+.fx-cg__lab{font-family:var(--fx-mono);font-size:10px;fill:var(--text-dim);letter-spacing:.02em}
+.fx-cg__eixo{font-family:var(--fx-mono);font-size:9px;fill:var(--text-dim);letter-spacing:.16em}
+.fx-cg__hit{fill:transparent}
+.fx-cg__row:hover .fx-cg__lab,.fx-cg__row.fx-is-ativo .fx-cg__lab{fill:var(--text)}
+.fx-cg__row:hover .fx-cg__trilho,.fx-cg__row.fx-is-ativo .fx-cg__trilho{opacity:.75}
+.fx-cg__row:hover .fx-cg__barra,.fx-cg__row.fx-is-ativo .fx-cg__barra{stroke:#FF8A4C;stroke-width:1.5}
+.fx-cg__tip{
+  position:absolute;
+  z-index:5;
+  left:0;
+  top:0;
+  width:200px;
+  padding:9px 11px;
+  border-radius:11px;
+  background:rgba(11,14,19,.97);
+  border:1px solid var(--line-hot);
+  box-shadow:0 12px 24px -12px rgba(11,14,19,.95);
+  pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(3px);
+  transition:opacity .12s ease,transform .12s ease;
+}
+.fx-cg__tip.fx-is-on{opacity:1;visibility:visible;transform:none}
+.fx-cg__tip-nome{display:block;font:400 11px/1.2 var(--fx-mono);letter-spacing:.02em;color:var(--text)}
+.fx-cg__tip-linha{display:flex;align-items:center;gap:6px;margin-top:6px;font:400 10px/1 var(--fx-mono);letter-spacing:.1em;color:var(--text-dim)}
+.fx-cg__tip-ponto{display:block;width:8px;height:8px;border-radius:999px;background:#C54302}
+.fx-cg__tip-ponto--medio{background:#E85616}
+.fx-cg__tip-ponto--alto{background:#FF7645}
+.fx-cg__tip-dica{display:block;margin-top:7px;font:400 11px/1.45 var(--fx-corpo);color:var(--text-dim)}
+
+/* janela vidro sobre metal */
+.fx-janela{position:relative;margin:14px 16px 0;height:130px;border-radius:16px;overflow:hidden}
+.fx-janela__miolo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.fx-janela__peso{font-family:var(--fx-display);font-size:44px;line-height:1;letter-spacing:.03em;color:var(--text)}
+.fx-janela__barra{position:absolute;left:0;right:0;top:0;z-index:2;height:52px;display:flex;align-items:center;padding:0 14px}
+
+.fx-rodape{margin-top:24px;padding:16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+
+/* ============================================================
+   MOVIMENTO REDUZIDO: decoracao animada desliga
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  .fx-faisca__p{animation:none;opacity:.28}
+  .fx-brasa--pulsa::before{animation:none}
+  .fx-emb__calor{animation:none}
+  .fx-cg__tip{transition:none}
+}
+
+/* ============ v30 · TRATAMENTO DAS ILUSTRACOES ============ */
+/* ============================================================================
+   FORJA · tratamento das imagens de exercicio · tema BRASA ESCURO
+   prefixo obrigatorio: img-
+   Um componente (.img-ficha) com tres familias:
+     .img-traco   27 desenhos de linha -> invert(1) + screen sobre placa escura
+     .img-render  15 renders 3D        -> chapa quente + multiply
+     .img-foto     8 fotos de estudio  -> chapa fria + vinheta + duotone
+   ARQUITETURA (mudou nesta revisao):
+     .img-palco  -> caixa, raio, recorte. NUNCA recebe filter/mask/transform.
+     .img-placa  -> camada isolada que carrega fundo + blend + mascara.
+     .img-carga / .img-falha -> IRMAOS da placa, ficam FORA da mascara.
+   Regra de custo: zero animacao em loop no estado final.
+   ========================================================================== */
+
+/* ---- 0. tokens locais (espelham os do app; caem no literal se faltarem) -- */
+.img-ficha,
+.img-demo{
+  --img-bg:#0B0E13;
+  --img-s1:#12171F;
+  --img-s2:#171E28;
+  --img-s3:#1D2531;
+  --img-line:#242C38;
+  --img-line-hot:#323C4B;
+  --img-text:#E9EDF3;
+  --img-dim:#98A2B1;
+  --img-faint:#7C8797;
+  --img-brasa-1:#973101;
+  --img-brasa-2:#C54302;
+  --img-brasa-3:#E85616;
+  --img-brasa-4:#FF7645;
+  --img-brasa-luz:#FF8A4C;
+
+  /* cor do card que fica ATRAS da ficha. A placa do traco pinta essa cor
+     por baixo da imagem: e o que torna o screen deterministico. */
+  --img-fundo-local:#12171F;
+
+  /* chapa clara das familias RENDER e FOTO */
+  --img-chapa-a:#E9E0D4;
+  --img-chapa-b:#C7BCAC;
+
+  --img-raio:14px;
+  --img-proporcao:1 / 1;   /* trocar aqui se o card usar 4/3 ou 16/9 */
+  --img-recuo:0%;          /* respiro da arte dentro da placa */
+
+  /* mascara padrao: so a familia clara precisa derreter a borda */
+  --img-mascara:radial-gradient(78% 74% at 50% 46%,
+                 #000 58%, rgba(0,0,0,.86) 78%, rgba(0,0,0,.34) 92%, transparent 100%);
+}
+
+.img-ficha,.img-ficha *,.img-ficha *::before,.img-ficha *::after,
+.img-demo,.img-demo *,.img-demo *::before,.img-demo *::after{ box-sizing:border-box; }
+
+/* ---- 1. componente base --------------------------------------------------
+   filter, mask e transform ficam SO na <img> e na .img-placa (absolutas,
+   sem filhos). Nenhum container da ficha vira bloco de contencao, entao
+   position:fixed de modal continua fixo em relacao a viewport.             */
+.img-ficha{ margin:0; display:block; }
+
+.img-palco{
+  position:relative;
+  aspect-ratio:var(--img-proporcao);
+  border-radius:var(--img-raio);
+  overflow:hidden;
+}
+
+/* camada de tratamento: fundo proprio + isolation. Isolar aqui e o que
+   mata a classe inteira de bug "retangulo preto": o blend passa a ver
+   sempre o fundo desta placa, nunca o de um ancestral qualquer. */
+.img-placa{
+  position:absolute;
+  inset:0;
+  isolation:isolate;
+  -webkit-mask-image:var(--img-mascara);
+          mask-image:var(--img-mascara);
+  -webkit-mask-repeat:no-repeat;
+          mask-repeat:no-repeat;
+  -webkit-mask-size:100% 100%;
+          mask-size:100% 100%;
+}
+
+/* CUIDADO: <img> absoluta com inset nos 4 lados e width:auto cai na regra de
+   elemento substituido e assume o TAMANHO INTRINSECO (spec CSS 2.1 10.3.8).
+   Por isso o recuo vem de left/top + width/height calculados, nunca de inset. */
+.img-arte{
+  position:absolute;
+  left:var(--img-recuo);
+  top:var(--img-recuo);
+  width:calc(100% - var(--img-recuo) * 2);
+  height:calc(100% - var(--img-recuo) * 2);
+  object-fit:contain;
+  display:block;
+  z-index:1;
+  opacity:1;                 /* estado seguro sem JS: imagem sempre visivel */
+}
+
+/* entrada: uma vez so, so opacity + transform */
+.img-ficha.img-e-carregando .img-arte{ opacity:0; transform:scale(.985); }
+.img-ficha.img-e-pronta .img-arte{
+  opacity:1; transform:none;
+  transition:opacity .26s ease-out, transform .26s ease-out;
+}
+.img-ficha.img-e-falha .img-arte{ display:none; }
+
+/* ANTES da demo: imagem crua, sem placa nenhuma */
+.img-cru .img-palco{ background:var(--img-s3); }
+
+/* ============================================================================
+   2. FAMILIA A · TRACO (27)
+   invert(1) faz traco preto virar claro e fundo branco virar PRETO PURO.
+   screen apaga preto puro por definicao -> some o fundo inteiro e sobra o
+   traco flutuando sobre a brasa. O backdrop e o fundo DESTA placa.
+   ========================================================================== */
+.img-traco{
+  --img-recuo:4%;
+  /* mascara larga: so arredonda o canto da placa, nao come traco */
+  --img-mascara:radial-gradient(90% 88% at 50% 50%,
+                 #000 72%, rgba(0,0,0,.7) 88%, rgba(0,0,0,.25) 100%);
+}
+.img-traco .img-placa{
+  background-color:var(--img-fundo-local);
+  background-image:
+    radial-gradient(58% 50% at 50% 42%, rgba(255,138,76,.15), rgba(255,138,76,0) 72%),
+    radial-gradient(120% 76% at 50% 116%, rgba(197,67,2,.22), rgba(197,67,2,0) 66%),
+    linear-gradient(180deg, rgba(233,237,243,.05), rgba(11,14,19,.18));
+  box-shadow:inset 0 -18px 26px -18px rgba(255,118,69,.30);
+}
+
+/* Ordem do filtro e o segredo:
+   contrast(1.16) ANTES do invert esmaga o quase-branco do webp (250,250,250)
+   em branco puro; sem isso o fundo vira cinza escuro e o screen deixa um veu
+   retangular. NUNCA contrast<1 depois do invert: ele tem offset positivo,
+   levanta o preto e a moldura volta.
+   brightness/sepia/saturate/hue-rotate sao matrizes SEM offset (0 continua 0),
+   entao da pra tintar a vontade que o screen continua apagando o fundo.
+   brightness(1.1) depois do invert acende so o antialias e devolve a
+   espessura aparente que o traco claro perde no escuro. */
+.img-traco .img-arte{
+  filter:contrast(1.16) invert(1) brightness(1.1) sepia(.3) saturate(1.3);
+  mix-blend-mode:screen;
+}
+/* frio: aco polido -> resolve em ~#B8DEFF (12.8:1 sobre #12171F) */
+.img-traco.img-aco .img-arte{
+  filter:contrast(1.16) invert(1) brightness(.62) sepia(1) hue-rotate(178deg)
+         saturate(1.35) brightness(1.14);
+}
+/* quente: brasa morna -> resolve em ~#FFEB9F (15.1:1) */
+.img-traco.img-brasa .img-arte{
+  filter:contrast(1.16) invert(1) brightness(.74) sepia(1) saturate(1.6)
+         brightness(1.06);
+}
+
+/* ============================================================================
+   3. FAMILIA B · RENDER (15)   4. FAMILIA C · FOTO (8)
+   Inverter estraga: corpo cinza claro some e vermelho de musculo vira ciano.
+   multiply e o operador certo: branco e o neutro do multiply, entao o fundo
+   branco (e o halo sujo da borda) DESAPARECE dentro da chapa, sem recorte.
+   ========================================================================== */
+.img-render,
+.img-foto{ --img-recuo:12%; }
+
+.img-render .img-placa,
+.img-foto .img-placa{
+  background-color:var(--img-chapa-a);
+  background-image:
+    repeating-linear-gradient(122deg, rgba(255,255,255,.055) 0 3px, rgba(29,37,49,.045) 3px 6px),
+    radial-gradient(86% 62% at 50% 8%, rgba(255,255,255,.45), rgba(255,255,255,0) 64%),
+    linear-gradient(158deg, var(--img-chapa-a) 0%, var(--img-chapa-b) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.65),           /* fio de luz no topo */
+    inset 0 0 0 1px rgba(29,37,49,.28),            /* aro fino */
+    inset 0 -18px 24px -14px rgba(151,49,1,.44),   /* brasa por baixo */
+    inset 0 12px 22px -14px rgba(29,37,49,.35);    /* sombra interna */
+}
+
+.img-render .img-arte{
+  mix-blend-mode:multiply;
+  filter:contrast(1.05) saturate(1.16) brightness(.99);
+}
+
+/* FOTO: chapa mais fria e escura, a foto aguenta mais tratamento */
+.img-foto .img-placa{
+  --img-chapa-a:#DFD6C8;
+  --img-chapa-b:#B4AA9C;
+}
+.img-foto .img-arte{
+  mix-blend-mode:multiply;
+  filter:grayscale(.3) saturate(.88) contrast(1.1) brightness(.98);
+}
+/* z-index explicito: ::before nasce como PRIMEIRO filho e pintaria abaixo da
+   imagem; ::after nasce como ULTIMO e, se estivesse no palco, pintaria por
+   cima do botao de erro. Dentro da placa isolada, com z-index, a ordem fica
+   chapa -> arte -> vinheta -> duotone, e nada vaza pros overlays. */
+.img-foto .img-placa::before,
+.img-foto .img-placa::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+}
+.img-foto .img-placa::before{           /* vinheta: so a borda escurece */
+  z-index:2;
+  background:radial-gradient(70% 64% at 50% 44%, rgba(11,14,19,0) 38%, rgba(11,14,19,.26) 76%, rgba(11,14,19,.58) 100%);
+  mix-blend-mode:multiply;
+}
+.img-foto .img-placa::after{            /* duotone: brasa na luz, aco na sombra */
+  z-index:3;
+  background:linear-gradient(168deg, rgba(232,86,22,.55) 0%, rgba(255,138,76,.20) 38%, rgba(50,60,75,.68) 100%);
+  mix-blend-mode:soft-light;
+  opacity:.85;
+}
+
+/* ---- 5. rede de seguranca: navegador sem mix-blend-mode ------------------
+   Sem blend nao da pra apagar branco. As tres familias caem pra chapa quase
+   branca: o fundo branco funde na placa e segue sem aresta dura.           */
+@supports not (mix-blend-mode:multiply){
+  .img-traco,.img-render,.img-foto{ --img-recuo:10%; }
+  .img-traco .img-placa,
+  .img-render .img-placa,
+  .img-foto .img-placa{
+    --img-chapa-a:#F4EFE7;
+    --img-chapa-b:#E2DACE;
+    background-color:var(--img-chapa-a);
+    background-image:linear-gradient(158deg, var(--img-chapa-a) 0%, var(--img-chapa-b) 100%);
+    box-shadow:inset 0 0 0 1px rgba(29,37,49,.25);
+  }
+  .img-traco .img-arte,
+  .img-render .img-arte,
+  .img-foto .img-arte{ mix-blend-mode:normal; filter:contrast(1.04); }
+  .img-foto .img-placa::before,
+  .img-foto .img-placa::after{ display:none; }
+}
+
+/* ============================================================================
+   6. CARREGANDO — irmao da placa, entao NAO leva mascara nem blend.
+   Unico elemento animado do sistema: .img-faisca, 1 por card, so enquanto
+   carrega, e sai do DOM visual (display:none) quando a imagem chega.
+   ========================================================================== */
+.img-carga{
+  position:absolute; inset:0; z-index:2;
+  display:none;
+  place-items:center;
+  background:linear-gradient(180deg,#1D2531 0%,#141A23 100%);
+  overflow:hidden;
+}
+.img-ficha.img-e-carregando .img-carga{ display:grid; }
+
+.img-glifo{
+  width:46%; max-width:96px; height:auto;
+  fill:var(--img-faint);      /* 3.35:1 sobre a chapa do esqueleto */
+}
+.img-faisca{
+  position:absolute; top:0; bottom:0; left:0;
+  width:42%;
+  background:linear-gradient(90deg, rgba(255,138,76,0) 0%, rgba(255,138,76,.18) 50%, rgba(255,138,76,0) 100%);
+  transform:translate3d(-120%,0,0);
+  animation:img-varre 1.25s linear infinite;
+}
+@keyframes img-varre{
+  from{ transform:translate3d(-120%,0,0); }
+  to  { transform:translate3d(340%,0,0); }
+}
+
+/* ---- 7. ERRO: o proprio fallback e o botao de nova tentativa ------------- */
+.img-falha{
+  position:absolute; inset:0; z-index:3;
+  display:none;
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:7px;
+  width:100%; min-height:44px;
+  padding:10px;
+  border:0;
+  border-radius:var(--img-raio);
+  background:repeating-linear-gradient(135deg,#1A212C 0 7px,#141A23 7px 14px);
+  box-shadow:inset 0 0 0 1px var(--img-line);
+  color:var(--img-dim);                 /* 6.3:1 sobre a listra */
+  font:500 11px/1.25 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+  letter-spacing:.06em; text-transform:uppercase; text-align:center;
+  cursor:pointer;
+  -webkit-appearance:none; appearance:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.img-ficha.img-e-falha .img-falha{ display:flex; }
+.img-falha svg{ width:22px; height:22px; fill:currentColor; stroke:currentColor; opacity:.85; }
+.img-falha b{ color:var(--img-brasa-4); font-weight:600; }  /* 6.1:1 */
+.img-falha:active{ transform:scale(.98); }
+.img-falha:focus-visible,
+.img-btn:focus-visible{ outline:2px solid var(--img-brasa-4); outline-offset:-3px; }
+
+/* ============================================================================
+   8. DEMONSTRACAO (card escuro de verdade, 390px)
+   ========================================================================== */
+.img-demo{
+  position:relative;
+  width:100%; max-width:390px; margin:0 auto;
+  padding:14px;
+  background:linear-gradient(168deg,#171E28 0%,#12171F 100%);
+  border:1px solid var(--img-line);
+  border-radius:16px;
+  color:var(--img-text);
+  font-family:'DM Sans', system-ui, -apple-system, sans-serif;
+  overflow:hidden;
+}
+.img-demo[data-fundo="s2"]{ background:#171E28; --img-fundo-local:#171E28; }
+.img-demo[data-fundo="s1"]{ background:#12171F; --img-fundo-local:#12171F; }
+.img-demo[data-fundo="grad"]{ --img-fundo-local:#151C25; }
+
+/* simula ancestral hostil (transform, opacity, will-change, isolation...) */
+.img-demo.img-hostil .img-palco{ isolation:isolate; }
+/* desliga a blindagem da placa pra mostrar o bug antigo */
+.img-demo.img-sem-placa .img-placa{
+  isolation:auto;
+  background:none;
+  box-shadow:none;
+  -webkit-mask-image:none;
+          mask-image:none;
+}
+
+.img-defs{ position:absolute; width:0; height:0; overflow:hidden; }
+
+.img-titulo{
+  margin:0;
+  font-family:'Bebas Neue','Oswald','Arial Narrow',sans-serif;
+  font-size:27px; line-height:1; letter-spacing:.04em;
+  color:var(--img-text);
+}
+.img-linha-fina{
+  margin:5px 0 0;
+  font-size:12.5px; line-height:1.45;
+  color:var(--img-dim);
+}
+
+.img-controles{ display:flex; flex-wrap:wrap; gap:7px; margin:13px 0 9px; }
+.img-btn{
+  flex:1 1 96px;
+  min-height:44px; min-width:44px;
+  padding:0 10px;
+  background:var(--img-s3);
+  border:1px solid var(--img-line-hot);
+  border-radius:11px;
+  color:var(--img-dim);                 /* 6:1 sobre #1D2531 */
+  font:600 10.5px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing:.06em; text-transform:uppercase;
+  cursor:pointer;
+  -webkit-appearance:none; appearance:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.img-btn b{ display:block; margin-top:4px; color:var(--img-brasa-4); font-weight:700; }
+.img-btn[aria-pressed="true"]{
+  background:linear-gradient(180deg,#C54302,#973101);
+  border-color:#FF7645;
+  color:#FFE7DA;                        /* 6.4:1 no ponto mais escuro */
+}
+.img-btn[aria-pressed="true"] b{ color:#FFE7DA; }
+.img-btn:active{ transform:scale(.985); }
+
+.img-aviso{
+  margin:0 0 4px;
+  padding:8px 10px;
+  background:rgba(151,49,1,.16);
+  border-left:2px solid var(--img-brasa-3);
+  border-radius:0 8px 8px 0;
+  color:var(--img-dim);                 /* 6:1 sobre a faixa */
+  font-size:11.5px; line-height:1.45;
+}
+.img-aviso b{ color:var(--img-brasa-4); }
+
+.img-familia{ margin-top:18px; padding-top:14px; border-top:1px solid var(--img-line); }
+.img-familia-nome{
+  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  margin:0;
+  font-family:'Bebas Neue','Oswald','Arial Narrow',sans-serif;
+  font-size:21px; line-height:1; letter-spacing:.05em;
+  color:var(--img-text);
+}
+.img-familia-nome span{
+  font:500 10px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing:.08em;
+  color:var(--img-brasa-4);             /* 6.8:1 */
+}
+.img-familia-nota{
+  margin:6px 0 12px;
+  font:500 10.5px/1.5 'JetBrains Mono', ui-monospace, monospace;
+  color:var(--img-dim);
+  word-break:break-word;
+}
+
+.img-par{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.img-lado{ min-width:0; }
+.img-tag{
+  display:block; margin-bottom:5px;
+  font:600 9.5px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing:.12em;
+  color:var(--img-dim);                 /* era --faint (3.9:1): reprovava */
+}
+.img-tag.img-tag-on{ color:var(--img-brasa-4); }
+.img-slug{
+  grid-column:1 / -1;
+  margin:6px 0 0;
+  font:500 10px/1.35 'JetBrains Mono', ui-monospace, monospace;
+  color:var(--img-dim);
+  word-break:break-all;
+}
+.img-slug i{ color:var(--img-brasa-4); font-style:normal; }
+
+.img-estados{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.img-estados .img-tag{ text-align:center; letter-spacing:.06em; }
+
+/* ---- 9. movimento reduzido: TODA animacao decorativa desliga ------------- */
+@media (prefers-reduced-motion:reduce){
+  .img-faisca{
+    animation:none;
+    transform:none;
+    left:0; width:100%;
+    opacity:.55;                        /* vira uma brasa parada no esqueleto */
+  }
+  .img-ficha.img-e-carregando .img-arte{ opacity:0; transform:none; }
+  .img-ficha.img-e-pronta .img-arte{ transition:none; transform:none; }
+  .img-arte{ transition:none; }
+  .img-falha:active,
+  .img-btn:active{ transform:none; }
+}
+
+/* ============ v30 · BRASA ENTRE CARDS ============ */
+/* ================================================================
+   FORJA · prefixo fg- · brasa e fogo passando de um card pro outro
+   REVISADO. Anima SO transform e opacity. Nenhum keyframe toca
+   filter, box-shadow, width, height ou background-position.
+   ================================================================ */
+
+.fg-palco{
+  /* superficies */
+  --fg-bg:#0B0E13; --fg-s1:#12171F; --fg-s2:#171E28; --fg-s3:#1D2531;
+  --fg-line:#242C38; --fg-line-hot:#323C4B;
+  /* tinta */
+  --fg-text:#E9EDF3; --fg-dim:#98A2B1; --fg-faint:#7C8797;
+  /* rampa brasa */
+  --fg-b1:#973101; --fg-b2:#C54302; --fg-b3:#E85616; --fg-b4:#FF7645; --fg-glow:#FF8A4C;
+  /* status */
+  --fg-ok:#09A66B; --fg-cardio:#0598CE; --fg-falta:#EB4D45; --fg-vazio:#2A3340;
+  /* geometria */
+  --fg-gut:18px;   /* calha: recuo dos cards */
+  --fg-gap:14px;   /* respiro entre cards */
+  --fg-tri:5px;    /* x do trilho dentro da lista */
+  --fg-tri-w:4px;  /* largura do trilho E do no (mesma peca) */
+  /* x do no/solda medido de dentro do card: cai EXATO em cima do trilho */
+  --fg-no-x:calc(var(--fg-tri) - var(--fg-gut));
+  /* rastro (escrito por JS) */
+  --fg-vel:0; --fg-ry:0px;
+
+  max-width:390px; margin:0 auto; padding:16px 12px 30px;
+  background:var(--fg-bg); color:var(--fg-text);
+  font-family:'DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-text-size-adjust:100%; -webkit-tap-highlight-color:transparent;
+}
+.fg-palco *{ box-sizing:border-box; }
+
+/* ---------- cabecalho de demo ---------- */
+.fg-cab{ padding-left:var(--fg-gut); margin:0 0 12px; }
+.fg-cab-tit{ margin:0; font-family:'Bebas Neue',Impact,sans-serif; font-size:27px;
+  line-height:1; letter-spacing:.05em; color:var(--fg-text); }
+.fg-cab-sub{ margin:6px 0 0; font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:11px; letter-spacing:.08em; color:var(--fg-dim); }
+
+/* ---------- controles ---------- */
+.fg-controles{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; padding-left:var(--fg-gut); }
+.fg-bt{ display:inline-flex; align-items:center; min-height:44px; min-width:44px;
+  padding:0 11px; border-radius:11px; border:1px solid var(--fg-line);
+  background:var(--fg-s2); color:var(--fg-dim); cursor:pointer;
+  font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px;
+  letter-spacing:.07em; text-transform:uppercase; }
+.fg-bt::before{ content:""; width:7px; height:7px; margin-right:7px; border-radius:50%;
+  background:var(--fg-vazio); flex:0 0 auto; }
+.fg-bt[aria-pressed="true"]{ color:var(--fg-text); background:var(--fg-s3); border-color:var(--fg-line-hot); }
+.fg-bt[aria-pressed="true"]::before{ background:var(--fg-b3); }
+.fg-bt:focus-visible,.fg-serie:focus-visible{ outline:2px solid var(--fg-b4); outline-offset:2px; }
+/* acao: rampa clareada — #0B0E13 sobre #E85616 da 5,3:1 (a antiga descia
+   ate #C54302 e entregava 3,8:1, abaixo do minimo pra texto de 11px) */
+.fg-bt-acao{ background:linear-gradient(180deg,var(--fg-glow),var(--fg-b3));
+  border-color:var(--fg-b2); color:#0B0E13; font-weight:700; }
+.fg-bt-acao::before{ display:none; }
+
+/* ================================================================
+   1. fg-trilho — canal continuo de metal incandescente
+   Uma peca so cobrindo a lista inteira: a continuidade nao e
+   emendada card a card.
+   ================================================================ */
+.fg-lista{ position:relative; display:flex; flex-direction:column;
+  gap:var(--fg-gap); padding-left:var(--fg-gut);
+  /* trava os z-index desta peca dentro dela: nenhum header sticky ou
+     barra fixed do app pode ser furado pelo card atual (z-index:5) */
+  isolation:isolate; }
+
+.fg-trilho{ position:absolute; left:var(--fg-tri); top:4px; bottom:4px; width:var(--fg-tri-w);
+  z-index:1; overflow:hidden; border-radius:2px; pointer-events:none;
+  /* textura de forja: escamas escuras estaticas por cima do metal quente */
+  background:
+    repeating-linear-gradient(180deg, rgba(11,14,19,.34) 0 1px, rgba(11,14,19,0) 1px 9px),
+    linear-gradient(180deg,#232B36 0%,#4A1900 9%,var(--fg-b1) 48%,#4A1900 91%,#232B36 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,118,69,.09); }
+
+/* brasa: elemento da altura do canal inteiro; so a faixa quente do
+   gradiente aparece, entao ela desce por dentro dos 4 cards de uma vez */
+.fg-brasa{ position:absolute; left:0; top:0; width:100%; height:100%; border-radius:2px;
+  background:linear-gradient(180deg,
+    rgba(255,118,69,0) 0%, rgba(255,118,69,0) 43%,
+    rgba(232,86,22,.55) 47%, var(--fg-glow) 50%, rgba(232,86,22,.55) 53%,
+    rgba(255,118,69,0) 57%, rgba(255,118,69,0) 100%);
+  transform:translate3d(0,-100%,0); opacity:.68;
+  animation:fg-k-descer 7.5s linear infinite; will-change:transform; }
+.fg-brasa:nth-child(2){ animation-duration:11.5s; animation-delay:-4s; opacity:.46; }
+.fg-brasa:nth-child(3){ animation-duration:9.2s;  animation-delay:-7s; opacity:.32; }
+@keyframes fg-k-descer{ from{transform:translate3d(0,-100%,0)} to{transform:translate3d(0,100%,0)} }
+
+/* rastro de calor que segue o scroll (posicao e opacidade vem do JS) */
+.fg-rastro{ position:absolute; left:0; top:0; width:100%; height:120px; border-radius:2px;
+  background:linear-gradient(180deg,rgba(255,138,76,0),var(--fg-glow) 50%,rgba(255,138,76,0));
+  opacity:calc(var(--fg-vel,0) * .5);
+  transform:translate3d(0,var(--fg-ry,0px),0);
+  will-change:transform,opacity; }
+
+/* no do trilho: estado do card impresso no canal.
+   left = --fg-no-x, calculado de --fg-tri e --fg-gut: encaixa no pixel. */
+.fg-no{ position:absolute; left:var(--fg-no-x); top:16px; width:var(--fg-tri-w); height:24px;
+  border-radius:2px; background:var(--fg-vazio); z-index:3; pointer-events:none; }
+.fg-feito .fg-no{ background:linear-gradient(180deg,var(--fg-ok),#05704A); }
+.fg-atual .fg-no{ top:14px; height:40px;
+  background:linear-gradient(180deg,var(--fg-b4),var(--fg-b3) 55%,var(--fg-b2));
+  box-shadow:0 0 10px 1px rgba(255,118,69,.55),0 0 24px 5px rgba(197,67,2,.26); }
+.fg-no i{ position:absolute; inset:-2px -1px; border-radius:3px;
+  background:var(--fg-glow); opacity:0; }
+.fg-atual .fg-no i{ animation:fg-k-pulso 2.8s ease-in-out infinite; will-change:transform,opacity; }
+@keyframes fg-k-pulso{ 0%,100%{opacity:.10;transform:scaleY(.86)} 50%{opacity:.48;transform:scaleY(1.06)} }
+
+/* ================================================================
+   2. fg-transbordo — o card quente derrama brasa pela borda de baixo
+   ================================================================ */
+.fg-transbordo{ position:absolute; left:16px; right:16px; bottom:0; height:0;
+  z-index:4; opacity:.72; pointer-events:none; }
+.fg-transbordo i{ position:absolute; bottom:0; width:4px; height:4px; border-radius:50%;
+  background:var(--fg-b4); box-shadow:0 0 7px 1px rgba(255,118,69,.5); opacity:0; }
+.fg-atual .fg-transbordo i{ animation:fg-k-verter 3.4s ease-out infinite;
+  will-change:transform,opacity; }
+.fg-transbordo i:nth-child(1){ left:11%; --fg-dx:7px;  animation-delay:-.5s; }
+.fg-transbordo i:nth-child(2){ left:45%; --fg-dx:-9px; animation-duration:4.2s; animation-delay:-2.3s; }
+.fg-transbordo i:nth-child(3){ left:78%; --fg-dx:5px;  animation-duration:2.9s; animation-delay:-1.4s; }
+@keyframes fg-k-verter{
+  0%  { transform:translate3d(0,-3px,0) scale(.55); opacity:0 }
+  16% { opacity:.95 }
+  62% { opacity:.42 }
+  100%{ transform:translate3d(var(--fg-dx,6px),26px,0) scale(.3); opacity:0 }
+}
+
+/* ================================================================
+   3. fg-varredura — onda de calor diagonal, uma passada so
+   Gradiente SO QUENTE: a versao antiga levava uma banda preta a 50%
+   que passava por cima do nome do exercicio e derrubava o contraste.
+   ================================================================ */
+.fg-varredura{ position:absolute; inset:0; z-index:4; border-radius:15px;
+  overflow:hidden; opacity:.8; pointer-events:none; }
+.fg-varredura i{ display:none; position:absolute; left:0; top:-60%; width:55%; height:220%;
+  background:linear-gradient(90deg,
+    rgba(255,138,76,0) 0%, rgba(197,67,2,.14) 34%,
+    rgba(255,138,76,.34) 58%, rgba(255,118,69,.10) 76%,
+    rgba(255,118,69,0) 100%);
+  transform:rotate(16deg) translate3d(-150%,0,0); }
+.fg-varre .fg-varredura i{ display:block; will-change:transform,opacity;
+  animation:fg-k-varre 800ms cubic-bezier(.34,.05,.24,1) both; }
+@keyframes fg-k-varre{
+  0%  { transform:rotate(16deg) translate3d(-150%,0,0); opacity:0 }
+  10% { opacity:1 }
+  88% { opacity:1 }
+  100%{ transform:rotate(16deg) translate3d(300%,0,0); opacity:0 }
+}
+
+/* ================================================================
+   4. fg-solda — costura incandescente ligando dois cards vizinhos
+   Nasce no trilho (mesmo --fg-no-x do no) e corre pra dentro da juncao.
+   ================================================================ */
+.fg-solda{ position:absolute; left:var(--fg-no-x); width:132px; height:2px; border-radius:1px;
+  bottom:calc(var(--fg-gap) / -2 - 1px); z-index:4; opacity:0; pointer-events:none;
+  background:linear-gradient(90deg,rgba(151,49,1,0),var(--fg-b2) 16%,var(--fg-b3) 48%,var(--fg-b2) 80%,rgba(151,49,1,0)); }
+.fg-tem-solda .fg-solda{ opacity:.9; }
+.fg-solda::before,.fg-solda::after{ content:""; position:absolute; top:-2px;
+  width:6px; height:6px; border-radius:50%; background:var(--fg-b3);
+  box-shadow:0 0 8px 1px rgba(232,86,22,.45); }
+.fg-solda::before{ left:-1px } .fg-solda::after{ right:-1px }
+.fg-solda i{ position:absolute; top:-2px; left:0; width:34px; height:6px; border-radius:3px;
+  background:linear-gradient(90deg,rgba(255,138,76,0),var(--fg-glow),rgba(255,138,76,0));
+  transform:translate3d(-40px,0,0); opacity:0; }
+.fg-tem-solda .fg-solda i{ animation:fg-k-solda 3.6s cubic-bezier(.5,0,.5,1) infinite;
+  will-change:transform,opacity; }
+@keyframes fg-k-solda{
+  0%  { transform:translate3d(-40px,0,0); opacity:0 }
+  10% { opacity:1 }
+  62% { transform:translate3d(130px,0,0); opacity:1 }
+  72%,100%{ transform:translate3d(130px,0,0); opacity:0 }
+}
+
+/* ================================================================
+   5. fg-fundo — brasas subindo por tras da pilha, vistas nas frestas
+   3 elementos pra LISTA INTEIRA, nao por card.
+   ================================================================ */
+.fg-fundo{ position:absolute; inset:0; z-index:0; overflow:hidden;
+  opacity:.7; pointer-events:none; }
+.fg-fundo i{ position:absolute; bottom:0; width:7px; height:100%; opacity:0;
+  background:radial-gradient(circle at 50% calc(100% - 7px),
+    var(--fg-b4) 0 1.7px, rgba(232,86,22,.32) 2.6px, rgba(232,86,22,0) 7px);
+  animation:fg-k-subir 14s linear infinite; will-change:transform,opacity; }
+.fg-fundo i:nth-child(1){ left:30% }
+.fg-fundo i:nth-child(2){ left:62%; animation-duration:18s; animation-delay:-7s }
+.fg-fundo i:nth-child(3){ left:86%; animation-duration:16s; animation-delay:-12s }
+@keyframes fg-k-subir{
+  0%{ transform:translate3d(0,0,0); opacity:0 }
+  12%{ opacity:.8 } 78%{ opacity:.3 }
+  100%{ transform:translate3d(0,-100%,0); opacity:0 }
+}
+
+/* ================================================================
+   CARD
+   ================================================================ */
+.fg-card{ position:relative; z-index:3; padding:13px 14px 12px; border-radius:16px;
+  border:1px solid var(--fg-line); background:var(--fg-s1); }
+.fg-feito{ background:linear-gradient(180deg,#111721,var(--fg-s1) 60%); }
+.fg-atual{ z-index:5; border-color:#3E2A20;
+  background:linear-gradient(180deg,var(--fg-s2),var(--fg-s1) 60%);
+  box-shadow:0 0 0 1px rgba(232,86,22,.16),0 12px 28px -16px rgba(232,86,22,.6); }
+/* fio de calor estatico na aresta de cima do card quente (custo zero) */
+.fg-atual::before{ content:""; position:absolute; left:18px; right:18px; top:-1px; height:1px;
+  background:linear-gradient(90deg,rgba(232,86,22,0),var(--fg-b3),rgba(232,86,22,0));
+  opacity:.7; pointer-events:none; }
+
+.fg-topo{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.fg-nome{ margin:0; font-family:'Bebas Neue',Impact,sans-serif; font-size:23px;
+  line-height:1.04; letter-spacing:.03em; color:var(--fg-text); }
+.fg-feito .fg-nome{ color:var(--fg-dim); }
+.fg-tag{ flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
+  font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10px;
+  letter-spacing:.12em; padding:4px 7px; border-radius:7px; border:1px solid transparent; }
+.fg-tag-ok { color:var(--fg-ok); border-color:rgba(9,166,107,.42);  background:rgba(9,166,107,.10) }
+.fg-tag-hot{ color:#0B0E13; border-color:var(--fg-b2); background:linear-gradient(180deg,var(--fg-b4),var(--fg-b3)) }
+.fg-tag-par{ color:var(--fg-b4); border-color:rgba(255,118,69,.35); background:rgba(255,118,69,.08) }
+.fg-chama{ width:8px; height:10px; flex:0 0 auto; fill:currentColor; }
+
+.fg-dados{ display:flex; gap:14px; margin:10px 0 0; }
+.fg-dado{ display:flex; flex-direction:column; gap:2px; min-width:0;
+  font-family:'JetBrains Mono',ui-monospace,monospace; }
+.fg-dado b{ font-size:14px; font-weight:600; color:var(--fg-text); line-height:1.1; }
+.fg-dado small{ font-size:10px; letter-spacing:.1em; color:var(--fg-dim); }
+.fg-feito .fg-dado b{ color:var(--fg-dim); }
+
+.fg-series{ display:grid; grid-template-columns:repeat(auto-fit,minmax(64px,1fr));
+  gap:6px; margin-top:11px; }
+.fg-serie{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:1px; min-width:0; min-height:44px; padding:0 4px; border-radius:11px;
+  border:1px solid var(--fg-line); background:var(--fg-s2); color:var(--fg-dim);
+  font-family:'JetBrains Mono',ui-monospace,monospace; cursor:pointer; }
+.fg-serie b{ font-size:12px; font-weight:600; }
+.fg-serie small{ font-size:10px; letter-spacing:.06em; }
+/* tinta verde sobre fundo mais claro raspava o minimo: baixei o veu
+   de .12 pra .08 e o verde volta pra 4,8:1 */
+.fg-serie.fg-ok{ color:var(--fg-ok); border-color:rgba(9,166,107,.5); background:rgba(9,166,107,.08); }
+.fg-atual .fg-serie:not(.fg-ok){ border-color:var(--fg-line-hot); color:var(--fg-text); }
+
+/* ---------- variante FORTE (mesmos elementos, so mais quente) ---------- */
+.fg-forte .fg-brasa{ animation-duration:4.8s; opacity:.95 }
+.fg-forte .fg-brasa:nth-child(2){ animation-duration:7.4s; opacity:.7 }
+.fg-forte .fg-brasa:nth-child(3){ animation-duration:6s;   opacity:.5 }
+.fg-forte .fg-transbordo{ opacity:1 }
+.fg-forte .fg-atual .fg-transbordo i{ animation-duration:2.5s }
+.fg-forte .fg-varredura{ opacity:1 }
+.fg-forte .fg-solda i{ animation-duration:2.3s }
+.fg-forte .fg-fundo{ opacity:1 }
+
+/* ---------- liga/desliga por efeito ---------- */
+.fg-off-trilho .fg-brasa{ display:none }        /* o canal continua canal */
+.fg-off-transbordo .fg-transbordo{ display:none }
+.fg-off-varredura .fg-varredura{ display:none }
+.fg-off-solda .fg-solda{ display:none }
+.fg-off-fundo .fg-fundo{ display:none }
+.fg-off-rastro .fg-rastro{ opacity:0 }
+
+/* ================================================================
+   MOVIMENTO REDUZIDO — nada corre, tudo continua fazendo sentido
+   ================================================================ */
+@media (prefers-reduced-motion: reduce){
+  .fg-palco *, .fg-palco *::before, .fg-palco *::after{
+    animation:none !important; transition:none !important; }
+  .fg-brasa{ opacity:.6; transform:translate3d(0,-16%,0) }
+  .fg-brasa:nth-child(2){ opacity:.34; transform:translate3d(0,20%,0) }
+  .fg-brasa:nth-child(3){ display:none }
+  .fg-rastro{ display:none }
+  .fg-fundo{ display:none }
+  .fg-varredura i{ display:none !important }
+  .fg-atual .fg-no i{ opacity:.34; transform:none }
+  /* brasas paradas, pousadas na borda de baixo do card quente */
+  .fg-atual .fg-transbordo i{ opacity:.55; transform:translate3d(0,5px,0) scale(.75) }
+  .fg-tem-solda .fg-solda i{ opacity:.9; transform:translate3d(48px,0,0) }
+}
+  /* ==================================================================
+     v30: escopo das pecas dentro do app. As pecas foram desenhadas com
+     um chassi de demonstracao (.fg-palco tem max-width/padding/fundo
+     proprios); aqui o id neutraliza esse chassi e mantem SO os tokens
+     e o escopo de prefers-reduced-motion.
+     ================================================================== */
+  #aluno-plano.fg-palco {
+    max-width: none; margin: 0; padding: 0; background: transparent;
+    font-family: inherit;
+  }
+  /* a calha do trilho substitui a barrinha por card: os cards recuam */
+  #aluno-plano.fg-lista { gap: 0.75rem; }
+  /* ficha de exercicio: a placa pinta o tom do card onde ela vive */
+  #treinar-ficha-fig, #exinfo-fig { --img-fundo-local: #171E28; margin: 0; }
+
 </style>
 
 <style id="console-css">
-  /* ===================== FORJA v29.10.0 — CONSOLE FERRO =====================
+  /* ===================== FORJA v30.0.0 — CONSOLE FERRO =====================
      Ilha ESCURA dentro de um app CLARO (design system v29). Por isso TUDO aqui
      e escopado em .frc — nada vaza pro resto do app, e o resto do app nao
      pinta nada aqui dentro.
@@ -930,6 +2341,20 @@
 </style>
 </head>
 <body>
+<svg class="img-defs" aria-hidden="true" focusable="false">
+    <symbol id="img-glifo-halter" viewBox="0 0 64 32">
+      <rect x="26" y="13.5" width="12" height="5" rx="2.5"/>
+      <rect x="14" y="8" width="10" height="16" rx="3.5"/>
+      <rect x="40" y="8" width="10" height="16" rx="3.5"/>
+      <rect x="6" y="11.5" width="6" height="9" rx="2.5"/>
+      <rect x="52" y="11.5" width="6" height="9" rx="2.5"/>
+    </symbol>
+    <symbol id="img-glifo-falha" viewBox="0 0 24 24">
+      <path d="M12 3.2 22 20.8H2L12 3.2Z" fill="none" stroke-width="1.7" stroke-linejoin="round"/>
+      <rect x="11.1" y="9" width="1.8" height="6" rx=".9" stroke="none"/>
+      <rect x="11.1" y="16.3" width="1.8" height="1.8" rx=".9" stroke="none"/>
+    </symbol>
+  </svg>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
@@ -999,73 +2424,299 @@
 
     <!-- v29: CENA DA FORJA - martelo batendo na lingota incandescente ("forjando a saude") -->
     <div class="forge-wrap mb-2">
-      <svg class="forge-svg" viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Martelo forjando uma lingota de ferro incandescente">
-        <defs>
-          <linearGradient id="gSteel" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#5A6675"/><stop offset="0.45" stop-color="#37404D"/><stop offset="1" stop-color="#1B2430"/>
-          </linearGradient>
-          <linearGradient id="gSteelBase" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#2C3542"/><stop offset="1" stop-color="#161C26"/>
-          </linearGradient>
-          <radialGradient id="gIngot" cx="0.38" cy="0.3" r="0.95">
-            <stop offset="0" stop-color="#FFF6C9"/><stop offset="0.3" stop-color="#FFCE5C"/>
-            <stop offset="0.6" stop-color="#F58B3C"/><stop offset="0.85" stop-color="#E04B18"/>
-            <stop offset="1" stop-color="#B23A12"/>
-          </radialGradient>
-          <radialGradient id="gGlowR" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stop-color="#FFB25E" stop-opacity="0.75"/>
-            <stop offset="0.6" stop-color="#F58B3C" stop-opacity="0.28"/>
-            <stop offset="1" stop-color="#F58B3C" stop-opacity="0"/>
-          </radialGradient>
-          <linearGradient id="gHammerHead" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#778394"/><stop offset="0.5" stop-color="#414B5A"/><stop offset="1" stop-color="#232B36"/>
-          </linearGradient>
-        </defs>
+      <svg class="hero-svg" viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+ <defs>
+  <!-- recorte do card: nada vaza no raio de 16px -->
+  <clipPath id="hero-clip"><rect x="0" y="0" width="260" height="200" rx="16"/></clipPath>
 
-        <!-- sombra no chao -->
-        <ellipse cx="120" cy="188" rx="86" ry="9" fill="#0E1116" opacity="0.07"/>
+  <radialGradient id="hero-gBg" cx="50%" cy="42%" r="74%">
+   <stop offset="0" stop-color="#171E28"/><stop offset=".52" stop-color="#12171F"/><stop offset="1" stop-color="#0B0E13"/>
+  </radialGradient>
+  <linearGradient id="hero-gFloor" x1="0" y1="158" x2="0" y2="200" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#12171F"/><stop offset="1" stop-color="#0B0E13"/>
+  </linearGradient>
+  <!-- tijolo em amarracao corrida: textura, nao marca -->
+  <pattern id="hero-pBrick" width="32" height="16" patternUnits="userSpaceOnUse">
+   <path d="M0,.5 H32 M0,8.5 H32 M.5,.5 V8.5 M16.5,8.5 V16.5" fill="none" stroke="#242C38" stroke-width="1" opacity=".5"/>
+  </pattern>
+  <!-- aco da bigorna: luz fria em cima, corpo escuro embaixo -->
+  <linearGradient id="hero-gSteel" x1="0" y1="74" x2="0" y2="136" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#6B7686"/><stop offset=".12" stop-color="#323C4B"/>
+   <stop offset=".52" stop-color="#242C38"/><stop offset="1" stop-color="#12171F"/>
+  </linearGradient>
+  <linearGradient id="hero-gHead" x1="0" y1="38" x2="0" y2="69" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#6B7686"/><stop offset=".3" stop-color="#323C4B"/>
+   <stop offset=".72" stop-color="#242C38"/><stop offset="1" stop-color="#171E28"/>
+  </linearGradient>
+  <!-- luz quente que a peca joga no metal em volta -->
+  <radialGradient id="hero-gWarm" cx="127" cy="74" r="84" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#FF7645" stop-opacity=".5"/>
+   <stop offset=".36" stop-color="#E85616" stop-opacity=".22"/>
+   <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+  </radialGradient>
+  <!-- temperatura da barra: nucleo branco no ponto do golpe -->
+  <radialGradient id="hero-gIngot" cx="127" cy="71" r="32" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#E9EDF3"/><stop offset=".14" stop-color="#FF8A4C"/>
+   <stop offset=".32" stop-color="#FF7645"/><stop offset=".56" stop-color="#E85616"/>
+   <stop offset=".8" stop-color="#C54302"/><stop offset="1" stop-color="#973101"/>
+  </radialGradient>
+  <radialGradient id="hero-gHalo">
+   <stop offset="0" stop-color="#FF7645" stop-opacity=".24"/>
+   <stop offset=".5" stop-color="#E85616" stop-opacity=".1"/>
+   <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="hero-gGlow">
+   <stop offset="0" stop-color="#FF8A4C" stop-opacity=".8"/>
+   <stop offset=".45" stop-color="#E85616" stop-opacity=".34"/>
+   <stop offset="1" stop-color="#C54302" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="hero-gWood" x1="0" y1="131" x2="0" y2="190" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#2A3340"/><stop offset=".4" stop-color="#171E28"/><stop offset="1" stop-color="#0B0E13"/>
+  </linearGradient>
+  <linearGradient id="hero-gWoodHot" x1="0" y1="131" x2="0" y2="172" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#C54302" stop-opacity=".45"/>
+   <stop offset=".45" stop-color="#973101" stop-opacity=".14"/>
+   <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="hero-gSmoke">
+   <stop offset="0" stop-color="#323C4B" stop-opacity=".55"/>
+   <stop offset=".55" stop-color="#242C38" stop-opacity=".2"/>
+   <stop offset="1" stop-color="#242C38" stop-opacity="0"/>
+  </radialGradient>
+  <!-- boca da fornalha: leito de brasa embaixo, fuligem em cima -->
+  <radialGradient id="hero-gFire" cx="30" cy="141" r="30" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#FF8A4C"/><stop offset=".26" stop-color="#FF7645"/>
+   <stop offset=".5" stop-color="#E85616"/><stop offset=".76" stop-color="#C54302"/>
+   <stop offset="1" stop-color="#973101"/>
+  </radialGradient>
+  <radialGradient id="hero-gSpill">
+   <stop offset="0" stop-color="#E85616" stop-opacity=".34"/>
+   <stop offset=".6" stop-color="#C54302" stop-opacity=".1"/>
+   <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="hero-gHoodHot" x1="0" y1="84" x2="0" y2="40" gradientUnits="userSpaceOnUse">
+   <stop offset="0" stop-color="#C54302" stop-opacity=".4"/>
+   <stop offset=".5" stop-color="#973101" stop-opacity=".12"/>
+   <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="hero-gVig" cx="50%" cy="44%" r="76%">
+   <stop offset=".5" stop-color="#0B0E13" stop-opacity="0"/>
+   <stop offset="1" stop-color="#0B0E13" stop-opacity=".8"/>
+  </radialGradient>
 
-        <!-- brilho quente ao redor da lingota (pulsa no impacto) -->
-        <ellipse id="forge-glow" cx="128" cy="98" rx="66" ry="34" fill="url(#gGlowR)"/>
+  <!-- filtros: TODOS em elemento estatico, nunca em coisa animada -->
+  <filter id="hero-fGlow" x="-60%" y="-160%" width="220%" height="420%"><feGaussianBlur stdDeviation="4"/></filter>
+  <!-- grao fino: aco martelado / poeira -->
+  <filter id="hero-fGrit" x="0" y="0" width="100%" height="100%">
+   <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" seed="9"/>
+   <feColorMatrix type="matrix" values="0 0 0 0 .42 0 0 0 0 .46 0 0 0 0 .53 0 0 0 .5 0"/>
+  </filter>
+  <!-- mancha larga: fuligem na parede, pedra, veio do cepo -->
+  <filter id="hero-fRock" x="0" y="0" width="100%" height="100%">
+   <feTurbulence type="fractalNoise" baseFrequency=".05 .09" numOctaves="4" seed="3"/>
+   <feColorMatrix type="matrix" values="0 0 0 0 .04 0 0 0 0 .06 0 0 0 0 .08 0 0 0 .95 -.28"/>
+  </filter>
 
-        <!-- bigorna: chifre + face + cintura + pe + pedestal -->
-        <path d="M62 104 q-30 1 -43 15 q17 12 43 7 Z" fill="url(#gSteel)"/>
-        <rect x="60" y="100" width="128" height="22" rx="5" fill="url(#gSteel)"/>
-        <rect x="60" y="100" width="128" height="5" rx="2.5" fill="#FFFFFF" opacity="0.28"/>
-        <path d="M100 122 h52 l-7 18 h-38 Z" fill="#232B36"/>
-        <rect x="84" y="140" width="84" height="11" rx="3" fill="url(#gSteelBase)"/>
-        <path d="M92 151 h68 l7 28 h-82 Z" fill="url(#gSteelBase)"/>
-        <rect x="86" y="176" width="80" height="6" rx="2" fill="#10151D"/>
+  <!-- silhueta da bigorna: chifre, face, cintura, pe -->
+  <path id="hero-anvil" d="M62,95 C74,84 90,76 112,76 L180,76 L189,82 L189,89 L180,95 L166,97 C160,105 159,111 163,118 L177,122 L179,134 L99,134 L101,122 L115,118 C119,111 118,105 112,97 Z"/>
+  <clipPath id="hero-clipAnvil"><use href="#hero-anvil"/></clipPath>
+  <path id="hero-stump" d="M93,133 L185,133 L190,189 L88,189 Z"/>
+  <clipPath id="hero-clipStump"><use href="#hero-stump"/></clipPath>
+  <clipPath id="hero-clipHearth"><rect x="4" y="83" width="62" height="72"/></clipPath>
+ </defs>
 
-        <!-- lingota incandescente sobre a face -->
-        <rect x="100" y="86" width="56" height="15" rx="4" fill="url(#gIngot)"/>
-        <rect id="forge-hot" x="100" y="86" width="56" height="15" rx="4" fill="#FFF3B0" opacity="0.35"/>
-        <rect x="100" y="86" width="56" height="15" rx="4" fill="none" stroke="#B23A12" stroke-opacity="0.5"/>
+ <g clip-path="url(#hero-clip)">
 
-        <!-- faiscas do impacto (burst sincronizado com o golpe) -->
-        <g id="forge-sparks">
-          <path d="M98 68 l2.2 -6.5 l2.2 6.5 l6.5 2.2 l-6.5 2.2 l-2.2 6.5 l-2.2 -6.5 l-6.5 -2.2 Z" fill="#FFB020"/>
-          <path d="M150 76 l1.8 -5 l1.8 5 l5 1.8 l-5 1.8 l-1.8 5 l-1.8 -5 l-5 -1.8 Z" fill="#EE5622"/>
-          <circle cx="160" cy="62" r="3" fill="#EE5622"/>
-          <circle cx="90" cy="90" r="2.5" fill="#F59E0B"/>
-          <circle cx="118" cy="58" r="2.2" fill="#FFCE5C"/>
-          <path d="M112 80 L103 66" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-          <path d="M142 78 L151 64" stroke="#EE5622" stroke-width="2" stroke-linecap="round"/>
-          <path d="M128 76 L128 60" stroke="#FFCE5C" stroke-width="2" stroke-linecap="round"/>
-        </g>
+  <!-- parede, chao e fuligem -->
+  <rect width="260" height="200" fill="url(#hero-gBg)"/>
+  <rect width="260" height="159" fill="url(#hero-pBrick)" opacity=".5"/>
+  <rect width="260" height="159" filter="url(#hero-fRock)" opacity=".38"/>
+  <rect y="158" width="260" height="42" fill="url(#hero-gFloor)"/>
+  <path d="M0,158.5 H260" stroke="#242C38" stroke-width="1" opacity=".7"/>
 
-        <!-- martelo (desenhado na posicao de contato; a animacao levanta e bate) -->
-        <g id="forge-hammer">
-          <path d="M140 84 L197 36" stroke="#6E4B24" stroke-width="11" stroke-linecap="round"/>
-          <path d="M141 82 L196 36" stroke="#A97B42" stroke-width="6.5" stroke-linecap="round"/>
-          <path d="M187 44 L197 36" stroke="#4C331A" stroke-width="11" stroke-linecap="round"/>
-          <g transform="rotate(50 132 84)">
-            <rect x="108" y="71" width="48" height="26" rx="6" fill="url(#gHammerHead)"/>
-            <rect x="108" y="71" width="48" height="6" rx="3" fill="#FFFFFF" opacity="0.25"/>
-            <rect x="126" y="78" width="12" height="12" rx="3" fill="#161C26" opacity="0.7"/>
-          </g>
-        </g>
-      </svg>
+  <!-- fornalha: chamine, coifa, corpo de pedra, boca -->
+  <g>
+   <rect x="27" y="0" width="22" height="39" fill="#171E28"/>
+   <rect x="27" y="0" width="5" height="39" fill="#242C38" opacity=".8"/>
+   <path d="M2,38 L72,38 L60,76 L10,76 Z" fill="#171E28"/>
+   <path d="M2,38 L72,38 L60,76 L10,76 Z" fill="url(#hero-gHoodHot)"/>
+   <path d="M2,38.6 L72,38.6" stroke="#242C38" stroke-width="1.2" opacity=".8"/>
+   <rect x="7" y="75" width="57" height="7" rx="2" fill="#242C38"/>
+   <path d="M8,81.4 L63,81.4" stroke="#C54302" stroke-width="1.6" opacity=".6"/>
+   <g fill="#171E28"><circle cx="14" cy="78.5" r="1.1"/><circle cx="28" cy="78.5" r="1.1"/><circle cx="42" cy="78.5" r="1.1"/><circle cx="56" cy="78.5" r="1.1"/></g>
+
+   <rect x="4" y="83" width="62" height="72" fill="#171E28"/>
+   <g clip-path="url(#hero-clipHearth)"><rect x="4" y="83" width="62" height="72" filter="url(#hero-fRock)" opacity=".5"/></g>
+   <path d="M4,99.5 H66 M4,117.5 H66 M4,137.5 H66 M24,83 V99.5 M46,99.5 V117.5 M18,117.5 V137.5 M40,137.5 V155" fill="none" stroke="#0B0E13" stroke-width="1.2" opacity=".55"/>
+   <!-- fio de luz quente na quina direita das pedras (a peca fica a direita) -->
+   <path d="M65.4,84 L65.4,154" stroke="#C54302" stroke-width="1.4" opacity=".3"/>
+
+   <path d="M14,150 L14,116 Q14,101 30,101 Q46,101 46,116 L46,150 Z" fill="#0B0E13"/>
+   <path class="hero-fire" d="M16,149 L16,116.5 Q16,103 30,103 Q44,103 44,116.5 L44,149 Z" fill="url(#hero-gFire)"/>
+   <g class="hero-fire">
+    <path class="hero-flame" d="M24,141 q2,-11 5,-15 q-1,7 2,11 q2,-4 2,-8 q4,9 -1,15 z" fill="#FF8A4C" opacity=".9"/>
+    <path class="hero-flame" d="M33,142 q2,-8 4,-11 q-1,6 1,9 q1,-3 2,-6 q3,7 -1,11 z" fill="#FF7645" opacity=".8" style="animation-delay:-.9s"/>
+   </g>
+   <g fill="#0B0E13" opacity=".65"><ellipse cx="22" cy="145" rx="5" ry="3"/><ellipse cx="32" cy="147" rx="6" ry="3.2"/><ellipse cx="40" cy="144" rx="4" ry="2.6"/></g>
+   <path d="M21,149 V131 M30,149 V127 M39,149 V131" stroke="#0B0E13" stroke-width="2.2" opacity=".7"/>
+   <path d="M14,150 L14,116 Q14,101 30,101 Q46,101 46,116 L46,150" fill="none" stroke="#323C4B" stroke-width="1.6"/>
+   <path d="M14.8,120 Q14.8,102.6 30,102.6" fill="none" stroke="#6B7686" stroke-width="1" opacity=".45"/>
+   <ellipse cx="32" cy="156" rx="46" ry="10" fill="url(#hero-gSpill)"/>
+  </g>
+
+  <!-- ferramentas ao fundo: tenaz e balde de tempera.
+       corpo em --line e fio de luz em --text-faint (3.9:1), senao somem -->
+  <g>
+   <g fill="none" stroke="#242C38" stroke-width="4" stroke-linecap="round">
+    <path d="M206,170 L222,110 q1.6,-8 -4.4,-10"/>
+    <path d="M219,170 L203,110 q-1.6,-8 4.4,-10"/>
+   </g>
+   <g fill="none" stroke="#6B7686" stroke-width="1" stroke-linecap="round" opacity=".5">
+    <path d="M204.6,170 L220.6,110"/><path d="M217.6,170 L201.6,110"/>
+   </g>
+   <circle cx="212.5" cy="140" r="2.8" fill="#323C4B"/>
+   <circle cx="211.6" cy="139.2" r="1" fill="#6B7686" opacity=".5"/>
+
+   <path d="M228,152 L254,152 L250,177 L232,177 Z" fill="#171E28"/>
+   <ellipse cx="241" cy="152" rx="13" ry="3.4" fill="#242C38"/>
+   <ellipse cx="241" cy="152.4" rx="10.4" ry="2.4" fill="#0B0E13"/>
+   <ellipse cx="240" cy="152.2" rx="6" ry="1.2" fill="#6B7686" opacity=".22"/>
+   <path d="M229.4,161 L252.6,161 M230.8,170 L251.2,170" stroke="#242C38" stroke-width="2"/>
+   <path d="M228.6,152.6 L232.6,177" stroke="#6B7686" stroke-width="1.1" opacity=".45"/>
+   <path d="M229,149 q12,-11 24,0" fill="none" stroke="#242C38" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+
+  <!-- vinheta: fecha as bordas e joga o olho pro centro -->
+  <rect width="260" height="200" fill="url(#hero-gVig)"/>
+
+  <!-- brilho ambiente da peca -->
+  <ellipse class="hero-breathe" cx="128" cy="82" rx="100" ry="60" fill="url(#hero-gHalo)"/>
+
+  <!-- chao: poca de luz refletida + sombra de contato (estaticas) -->
+  <ellipse cx="139" cy="186" rx="82" ry="12" fill="url(#hero-gGlow)" filter="url(#hero-fGlow)" opacity=".4"/>
+  <ellipse cx="139" cy="185" rx="52" ry="7" fill="#0B0E13" opacity=".7"/>
+
+  <!-- cepo de madeira com aro de ferro -->
+  <g>
+   <use href="#hero-stump" fill="url(#hero-gWood)"/>
+   <g clip-path="url(#hero-clipStump)">
+    <rect x="86" y="131" width="106" height="60" filter="url(#hero-fRock)" opacity=".45"/>
+    <rect x="86" y="131" width="106" height="60" filter="url(#hero-fGrit)" opacity=".14"/>
+    <path d="M171,133 L185,133 L190,189 L175,189 Z" fill="#0B0E13" opacity=".4"/>
+    <g stroke="#0B0E13" stroke-width="1.2" fill="none" opacity=".55" stroke-linecap="round">
+     <path d="M107,134 C104,151 106,169 103,187"/>
+     <path d="M125,135 C128,149 123,167 126,187"/>
+     <path d="M146,134 C143,153 147,171 145,187"/>
+     <path d="M164,135 C167,151 163,167 166,186"/>
+     <path d="M116,142 C114,152 116,160 115,168"/>
+     <path d="M155,148 C157,158 154,164 155,172"/>
+    </g>
+    <path d="M93,133 L185,133 L190,189 L88,189 Z" fill="url(#hero-gWoodHot)"/>
+    <path d="M90.8,158 L187.2,158 L188,167 L90,167 Z" fill="#242C38"/>
+    <path d="M90.8,158.6 L187.2,158.6" stroke="#6B7686" stroke-width="1" opacity=".35"/>
+    <path d="M90.2,166.4 L188,166.4" stroke="#0B0E13" stroke-width="1.4" opacity=".6"/>
+    <path d="M90.8,159.4 L187.4,159.4" stroke="#C54302" stroke-width="1" opacity=".28"/>
+    <g fill="#171E28"><circle cx="104" cy="162.4" r="1.6"/><circle cx="139" cy="162.4" r="1.6"/><circle cx="174" cy="162.4" r="1.6"/></g>
+    <g fill="#6B7686" opacity=".3"><circle cx="103.4" cy="161.8" r=".7"/><circle cx="138.4" cy="161.8" r=".7"/><circle cx="173.4" cy="161.8" r=".7"/></g>
+   </g>
+   <path d="M93,133.6 L185,133.6" stroke="#C54302" stroke-width="1.6" opacity=".45"/>
+   <path d="M97,133 q6,-2.6 11,0 q7,-2.2 12,0" fill="none" stroke="#0B0E13" stroke-width="1.2" opacity=".5"/>
+  </g>
+
+  <!-- fumaca: cepo chamuscado e boca da fornalha -->
+  <g>
+   <ellipse class="hero-smoke hero-sm1" cx="98" cy="131" rx="9" ry="6" fill="url(#hero-gSmoke)" style="--hero-sx:-9px"/>
+   <ellipse class="hero-smoke hero-sm2" cx="180" cy="130" rx="8" ry="5.5" fill="url(#hero-gSmoke)" style="--hero-sx:11px;animation-delay:-2.2s"/>
+   <ellipse class="hero-smoke hero-sm3" cx="188" cy="136" rx="6.5" ry="4.5" fill="url(#hero-gSmoke)" style="--hero-sx:6px;animation-delay:-4.4s"/>
+   <ellipse class="hero-smoke hero-sm4" cx="31" cy="100" rx="8" ry="5" fill="url(#hero-gSmoke)" style="--hero-sx:4px;--hero-sy2:-30px;animation-delay:-3.1s"/>
+  </g>
+
+  <!-- brasas da fornalha -->
+  <g>
+   <circle class="hero-ember hero-f1" cx="27" cy="128" r="1.1" fill="#FF7645" style="--hero-ex:5px;--hero-ey:-34px"/>
+   <circle class="hero-ember hero-f2" cx="36" cy="132" r=".9" fill="#FF8A4C" style="--hero-ex:-4px;--hero-ey:-40px;animation-delay:-2.6s"/>
+  </g>
+
+  <!-- bigorna -->
+  <g>
+   <use href="#hero-anvil" fill="url(#hero-gSteel)"/>
+   <g clip-path="url(#hero-clipAnvil)">
+    <rect x="60" y="74" width="132" height="62" filter="url(#hero-fGrit)" opacity=".2"/>
+    <path d="M118,86 L134,84 M140,88 L152,86.6 M124,104 L132,103" stroke="#0B0E13" stroke-width="1" opacity=".35" fill="none"/>
+   </g>
+   <use href="#hero-anvil" fill="url(#hero-gWarm)"/>
+   <path d="M112,76 L180,76 L180,80.4 L112,80.4 Z" fill="#C54302" opacity=".3"/>
+   <path d="M62,95 C74,84 90,76 112,76 L180,76 L189,82" fill="none" stroke="#98A2B1" stroke-width="1.6" stroke-linecap="round" opacity=".5"/>
+   <rect x="164" y="76.6" width="7" height="3" rx=".6" fill="#0B0E13" opacity=".8"/>
+   <path d="M164.4,76.9 L170.6,76.9" stroke="#6B7686" stroke-width=".8" opacity=".4"/>
+   <ellipse cx="176" cy="78.3" rx="1.8" ry="1" fill="#0B0E13" opacity=".8"/>
+   <path d="M112,80.6 L180,80.6" stroke="#0B0E13" stroke-width="1.4" opacity=".45"/>
+   <path d="M112,97 C118,105 119,111 115,118" fill="none" stroke="#0B0E13" stroke-width="1.6" opacity=".38"/>
+   <path d="M166,97 C160,105 159,111 163,118" fill="none" stroke="#6B7686" stroke-width="1" opacity=".22"/>
+   <path d="M101,122.5 L177,122.5" stroke="#0B0E13" stroke-width="1.2" opacity=".4"/>
+   <path d="M99,133.4 L179,133.4" stroke="#0B0E13" stroke-width="1.6" opacity=".55"/>
+   <path d="M104,134 L113,134 L110.5,140 L106,140 Z" fill="#242C38"/>
+   <path d="M166,134 L175,134 L173,140 L168.5,140 Z" fill="#242C38"/>
+  </g>
+
+  <!-- peca incandescente -->
+  <ellipse class="hero-breathe" cx="127" cy="73" rx="48" ry="21" fill="url(#hero-gGlow)"/>
+  <path class="hero-ingot" d="M98,78.6 L98,71.4 Q98,68.8 101.6,68.7 L149.5,68 L156,72.4 L156,78.6 Z" fill="url(#hero-gIngot)"/>
+  <path d="M102,70.4 L145,69.6" stroke="#E9EDF3" stroke-width="1" opacity=".3" stroke-linecap="round"/>
+  <g fill="#973101" opacity=".55"><ellipse cx="150" cy="74" rx="2.2" ry="1.2"/><ellipse cx="153.4" cy="77" rx="1.6" ry=".9"/></g>
+
+  <!-- brasas da peca -->
+  <g>
+   <circle class="hero-ember hero-e1" cx="117" cy="67" r="1.5" fill="#FF7645" style="--hero-ex:-10px;--hero-ey:-52px"/>
+   <circle class="hero-ember hero-e2" cx="136" cy="68" r="1.2" fill="#FF8A4C" style="--hero-ex:8px;--hero-ey:-60px;animation-delay:-1.1s"/>
+   <circle class="hero-ember hero-e3" cx="146" cy="70" r="1" fill="#E85616" style="--hero-ex:12px;--hero-ey:-46px;animation-delay:-2.3s"/>
+   <circle class="hero-ember hero-e4" cx="108" cy="71" r="1.1" fill="#FF7645" style="--hero-ex:-14px;--hero-ey:-58px;animation-delay:-3.1s"/>
+  </g>
+
+  <!-- ondas de calor -->
+  <g fill="none" stroke="#FF7645" stroke-linecap="round">
+   <path class="hero-heat hero-hw1" d="M99,65 q5,-7 0,-13 q-5,-6 0,-12" stroke-width="1.4"/>
+   <path class="hero-heat hero-hw2" d="M153,65 q-5,-7 0,-13 q5,-6 0,-12" stroke-width="1.2" style="animation-delay:-.72s"/>
+   <path class="hero-heat hero-hw3" d="M87,68 q4,-6 0,-11" stroke-width="1" style="animation-delay:-1.38s"/>
+  </g>
+
+  <!-- martelo: cabo com couro, virola, cabeca com colar de face -->
+  <g class="hero-hammer">
+   <path d="M143,52 L238,44" stroke="#242C38" stroke-width="8.5" stroke-linecap="round" fill="none"/>
+   <path d="M146,48.8 L235,41.4" stroke="#323C4B" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".6"/>
+   <path d="M146,55.2 L235,47.6" stroke="#973101" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".55"/>
+   <g stroke="#0B0E13" stroke-width="1.3" opacity=".55" fill="none">
+    <path d="M212,48.6 L215,43.4"/><path d="M219,48 L222,42.8"/><path d="M226,47.4 L229,42.2"/><path d="M233,46.8 L236,41.6"/>
+   </g>
+   <circle cx="238" cy="44" r="5.6" fill="#242C38"/>
+   <path d="M234.6,40.6 a5.6,5.6 0 0 1 5,-1.5" fill="none" stroke="#6B7686" stroke-width="1" opacity=".45"/>
+   <rect x="146" y="45.4" width="9" height="12" rx="1.6" fill="#6B7686" opacity=".7" transform="rotate(-5 150.5 51.4)"/>
+   <path d="M113,38 L147,38 L150,45 L150,58 L147,62 L114,62 L111,58 L111,45 Z" fill="url(#hero-gHead)"/>
+   <path d="M113,38 L147,38 L150,45 L111,45 Z" fill="#6B7686" opacity=".28"/>
+   <path d="M113.6,38.7 L146.4,38.7" stroke="#98A2B1" stroke-width="1" opacity=".4"/>
+   <path d="M111,45.6 L150,45.6" stroke="#0B0E13" stroke-width="1" opacity=".35"/>
+   <path d="M110,62 L151,62 L148,69 L113,69 Z" fill="url(#hero-gHead)"/>
+   <path d="M110,62 L151,62 L148,69 L113,69 Z" fill="#E85616" opacity=".28"/>
+   <path d="M110.6,62.6 L150.4,62.6" stroke="#6B7686" stroke-width="1" opacity=".4"/>
+   <path d="M113.8,68.3 L147.2,68.3" stroke="#FF8A4C" stroke-width="1.5" stroke-linecap="round" opacity=".8"/>
+  </g>
+
+  <!-- clarao, anel de choque e leque de faiscas -->
+  <ellipse class="hero-flash" cx="127" cy="70" rx="30" ry="12" fill="url(#hero-gGlow)"/>
+  <ellipse class="hero-flash hero-flash-b" cx="127" cy="70" rx="9" ry="3" fill="#E9EDF3"/>
+  <ellipse class="hero-ring" cx="127" cy="77" rx="15" ry="4" fill="none" stroke="#FF8A4C" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+  <g>
+   <g class="hero-spk-c" style="--hero-dx:58px;--hero-up:-13px;--hero-dn:30px"><g class="hero-sy hero-sy-c"><path d="M126.6,67.4 L133,66.8 L134.4,67.4 L133,68 Z" transform="rotate(-8 127 67.4)" fill="#FF7645"/></g></g>
+   <g class="hero-spk-b" style="--hero-dx:40px;--hero-up:-17px;--hero-dn:24px"><g class="hero-sy hero-sy-b"><path d="M126.6,67.2 L132,66.7 L133.2,67.2 L132,67.7 Z" transform="rotate(-18 127 67.2)" fill="#FF8A4C"/></g></g>
+   <g class="hero-spk-a" style="--hero-dx:25px;--hero-up:-23px;--hero-dn:13px"><circle class="hero-sy hero-sy-a" cx="128" cy="67" r="1.1" fill="#FF8A4C"/></g>
+   <g class="hero-spk-a" style="--hero-dx:11px;--hero-up:-31px;--hero-dn:6px"><circle class="hero-sy hero-sy-a" cx="129" cy="66.4" r=".9" fill="#FF7645"/></g>
+   <g class="hero-spk-c" style="--hero-dx:-49px;--hero-up:-12px;--hero-dn:30px"><g class="hero-sy hero-sy-c"><path d="M127.4,67.4 L121,66.8 L119.6,67.4 L121,68 Z" transform="rotate(8 127 67.4)" fill="#E85616"/></g></g>
+   <g class="hero-spk-b" style="--hero-dx:-31px;--hero-up:-19px;--hero-dn:26px"><g class="hero-sy hero-sy-b"><path d="M127.4,67.2 L122,66.7 L120.8,67.2 L122,67.7 Z" transform="rotate(18 127 67.2)" fill="#FF7645"/></g></g>
+   <g class="hero-spk-a" style="--hero-dx:-17px;--hero-up:-25px;--hero-dn:11px"><circle class="hero-sy hero-sy-a" cx="126" cy="67" r="1" fill="#FF8A4C"/></g>
+  </g>
+
+ </g>
+</svg>
     </div>
 
     <div class="text-center mb-10">
@@ -1119,7 +2770,7 @@
 <!-- TELA: TRAINER DASHBOARD                     -->
 <!-- =========================================== -->
 <section id="view-trainer" class="hidden min-h-screen pb-16">
-  <header class="scanbar px-6 py-4 sticky top-0 z-30" style="background:rgba(255,255,255,0.86);backdrop-filter:blur(14px);border-bottom:1px solid #E7EAEE;box-shadow:0 2px 12px rgba(14,17,22,0.05)">
+  <header class="scanbar fx-aco-escovado fx-vidro px-6 py-4 sticky top-0 z-30" style="background:rgba(18,23,31,0.78);backdrop-filter:blur(14px) saturate(125%);border-bottom:1px solid #242C38;box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 20px rgba(0,0,0,0.5)">
     <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 bg-steel flex items-center justify-center display text-xl text-white" style="border-radius:10px;">F</div>
@@ -1161,7 +2812,7 @@
 <!-- TELA: EDITAR ALUNO (TRAINER)                -->
 <!-- =========================================== -->
 <section id="view-edit-aluno" class="hidden min-h-screen pb-16">
-  <header class="scanbar px-6 py-4 sticky top-0 z-30" style="background:rgba(255,255,255,0.86);backdrop-filter:blur(14px);border-bottom:1px solid #E7EAEE;box-shadow:0 2px 12px rgba(14,17,22,0.05)">
+  <header class="scanbar fx-aco-escovado fx-vidro px-6 py-4 sticky top-0 z-30" style="background:rgba(18,23,31,0.78);backdrop-filter:blur(14px) saturate(125%);border-bottom:1px solid #242C38;box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 20px rgba(0,0,0,0.5)">
     <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
       <button onclick="navigateTo('#trainer')" class="mono text-xs text-zinc-400 hover:text-white tracking-widest">◂ ALUNOS</button>
       <div id="edit-aluno-title" class="display text-2xl"></div>
@@ -1256,7 +2907,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div class="mono text-[10px] text-zinc-500 tracking-widest">PROGRESSAO DE CARGA</div>
           <label class="mono text-[10px] text-zinc-500 tracking-widest flex items-center gap-1.5 cursor-pointer ml-auto mr-2">
-            <input type="checkbox" id="evo-compare-trainer" style="accent-color:#EE5622" /> COMPARAR ALUNOS
+            <input type="checkbox" id="evo-compare-trainer" style="accent-color:#E85616" /> COMPARAR ALUNOS
           </label>
           <select id="evo-select-trainer" class="text-xs"></select>
         </div>
@@ -1301,7 +2952,7 @@
 <!-- TELA: ALUNO DASHBOARD                       -->
 <!-- =========================================== -->
 <section id="view-aluno" class="hidden min-h-screen pb-16">
-  <header class="scanbar px-6 py-4 sticky top-0 z-30" style="background:rgba(255,255,255,0.86);backdrop-filter:blur(14px);border-bottom:1px solid #E7EAEE;box-shadow:0 2px 12px rgba(14,17,22,0.05)">
+  <header class="scanbar fx-aco-escovado fx-vidro px-6 py-4 sticky top-0 z-30" style="background:rgba(18,23,31,0.78);backdrop-filter:blur(14px) saturate(125%);border-bottom:1px solid #242C38;box-shadow:0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 20px rgba(0,0,0,0.5)">
     <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div id="aluno-avatar" class="avatar bg-steel text-white">—</div>
@@ -1370,7 +3021,7 @@
 </section>
 
 <!-- =========================================== -->
-<!-- TELA: CONSOLE FERRO (v29.10.0)              -->
+<!-- TELA: CONSOLE FERRO (v30.0.0)              -->
 <!-- Somente leitura. O conteudo inteiro e       -->
 <!-- montado por frcRender() a partir de         -->
 <!-- APP.data — esta tela nao vai na rede.       -->
@@ -1411,15 +3062,19 @@
     <div id="treinar-ja-salvo" class="hidden mono text-[10px] text-emerald-400 tracking-widest mb-2">✓ JA REGISTRADO NESTA SESSAO — mostrando o que voce salvou</div>
     <!-- v29.8.1: FICHA embutida (COMO FAZER) — sempre visivel quando o exercicio
          tem cadastro na tabela exercicios; some quando nao tem. -->
-    <div id="treinar-ficha" class="hidden mb-4 mt-2 p-3 border" style="border-color:rgba(238,86,34,.4);border-radius:12px;">
-      <div class="mono text-[10px] tracking-widest mb-2" style="color:#EE5622;">COMO FAZER</div>
+    <div id="treinar-ficha" class="hidden mb-4 mt-2 p-3 border" style="border-color:rgba(232,86,22,.5);border-radius:12px;">
+      <div class="mono text-[10px] tracking-widest mb-2" style="color:#FF7645;">COMO FAZER</div>
       <!-- SEM loading="lazy": dentro de container position:fixed o Chrome pode
            nunca disparar o load lazy (calcula proximidade pelo scroller raiz)
            — a imagem ficava pendente pra sempre. O src so e setado quando o
            bloco aparece, entao eager aqui nao custa nada. -->
-      <img id="treinar-ficha-img" class="hidden w-full" alt="ilustracao do exercicio"
-           style="max-height:160px;object-fit:contain;background:#fff;border-radius:8px;"
-           onerror="this.classList.add('hidden')" />
+      <figure id="treinar-ficha-fig" class="img-ficha hidden">
+        <div class="img-palco">
+          <div class="img-placa"><img id="treinar-ficha-img" class="img-arte" decoding="async" alt="ilustracao do exercicio"></div>
+          <div class="img-carga" aria-hidden="true"><svg class="img-glifo" viewBox="0 0 64 32"><use href="#img-glifo-halter"></use></svg><span class="img-faisca"></span></div>
+          <button class="img-falha" type="button" data-img-tentar><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#img-glifo-falha"></use></svg>Sem imagem<b>tocar pra tentar</b></button>
+        </div>
+      </figure>
       <div id="treinar-ficha-chips" class="flex flex-wrap gap-2 mt-2"></div>
       <div id="treinar-ficha-instrucoes" class="text-sm text-zinc-300 leading-relaxed mt-2"></div>
       <div id="treinar-ficha-fonte" class="hidden mono text-[9px] text-zinc-600 tracking-widest mt-2">DADOS/IMAGEM: WGER.DE (CC-BY-SA)</div>
@@ -1652,9 +3307,13 @@
     <div id="exinfo-instrucoes" class="text-sm text-zinc-300 leading-relaxed mb-4"></div>
     <!-- v29.8.1 BUGFIX: loading="lazy" removido — em modal position:fixed o
          Chrome podia nunca disparar o load (imagem pendente pra sempre). -->
-    <img id="exinfo-img" class="hidden w-full mb-4" alt="ilustracao do exercicio"
-         style="max-height:260px;object-fit:contain;background:#fff;border-radius:4px;"
-         onerror="this.classList.add('hidden')" />
+    <figure id="exinfo-fig" class="img-ficha hidden" style="margin-bottom:1rem">
+      <div class="img-palco">
+        <div class="img-placa"><img id="exinfo-img" class="img-arte" decoding="async" alt="ilustracao do exercicio"></div>
+        <div class="img-carga" aria-hidden="true"><svg class="img-glifo" viewBox="0 0 64 32"><use href="#img-glifo-halter"></use></svg><span class="img-faisca"></span></div>
+        <button class="img-falha" type="button" data-img-tentar><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#img-glifo-falha"></use></svg>Sem imagem<b>tocar pra tentar</b></button>
+      </div>
+    </figure>
     <div id="exinfo-fonte" class="hidden mono text-[9px] text-zinc-600 tracking-widest">DADOS/IMAGEM: WGER.DE (CC-BY-SA)</div>
   </div>
 </div>
@@ -1983,7 +3642,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v29.10.0';
+const FORJA_VERSION = 'v30.0.0';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao
@@ -2000,10 +3659,10 @@ const DAYS = ['A', 'B', 'C', 'D', 'E'];
 // global das utilitarias cyan (o accent brasa remapeia text-cyan-400, que era o dia D)
 const DAY_COLORS_TEXT = { A: 'day-tx-a', B: 'day-tx-b', C: 'day-tx-c', D: 'day-tx-d', E: 'day-tx-e' };
 const DAY_COLORS_BG   = { A: 'day-bg-a', B: 'day-bg-b', C: 'day-bg-c', D: 'day-bg-d', E: 'day-bg-e' };
-const DAY_COLORS_HEX  = { A: '#DC2626',  B: '#C77400',  C: '#0B8A55',  D: '#0E7490',  E: '#7C3AED'  };
+const DAY_COLORS_HEX  = { A: '#EB4D45',  B: '#BE7C05',  C: '#09A66B',  D: '#0598CE',  E: '#9276E2'  };
 function dayColorText(d) { return DAY_COLORS_TEXT[String(d).toUpperCase()] || 'text-zinc-400'; }
 function dayColorBg(d)   { return DAY_COLORS_BG[String(d).toUpperCase()]   || 'bg-zinc-400'; }
-function dayColorHex(d)  { return DAY_COLORS_HEX[String(d).toUpperCase()]  || '#8B93A0'; }
+function dayColorHex(d)  { return DAY_COLORS_HEX[String(d).toUpperCase()]  || '#7C8797'; }
 function emptyPlanoMap() { const o = {}; DAYS.forEach(d => o[d] = []); return o; }
 
 const APP = {
@@ -2248,13 +3907,27 @@ function dataLocalIso(ts) {
     const d = new Date(s);
     if (isNaN(d.getTime())) {
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      return m ? `${m[1]}-${m[2]}-${m[3]}` : s.slice(0, 10);
+      // v29.10.0: sem prefixo ISO -> '' (SEM DATA), nao mais s.slice(0, 10).
+      // O slice era inalcancavel pra dado bom: pra ele devolver um YYYY-MM-DD
+      // valido, s teria que COMECAR com esse padrao — mas ai o match logo
+      // acima ja teria casado e retornado. Ou seja, o ramo SO conseguia
+      // emitir lixo: "data-quebrada-aqui" virava "data-quebr", uma
+      // pseudo-data que nao e ISO mas ordena como string e ganha de
+      // QUALQUER data real na comparacao '>'. Um unico registro assim
+      // sequestrava o "ULT" do painel do aluno (mostrava "ULT: A · —",
+      // porque daysAgo() nao parseia a pseudo-data), travava o "ultima
+      // sessao" no dashboard do trainer, entrava no filtrarPeriodo()
+      // ("d" > "2") e roubava o topo do ultimoRegistroDe(). Com '', os
+      // guardas `if (!d) return` que JA existem nesses lacos finalmente
+      // fazem efeito, e quem nao tem guarda (calendario, mapaIsoParaDias,
+      // fmtDate) ja tratava string invalida do mesmo jeito.
+      return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
     }
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
-  } catch { return String(ts || '').slice(0, 10); }
+  } catch { return ''; } // v29.10.0: mesmo motivo do fallback acima - lixo vira SEM DATA, nao pseudo-data
 }
 
 // Extrai YYYY-MM-DD do campo data_treino, tolerando o que o Google Sheets
@@ -2378,7 +4051,7 @@ function renderEvoCalendario(regs, containerId) {
       cls = 'cal-falta';
       faltas++;
     } else if (ehHoje) {
-      cls = 'text-cyan-300'; sty = 'box-shadow: inset 0 0 0 2px #EE5622;';
+      cls = 'text-cyan-300'; sty = 'box-shadow: inset 0 0 0 2px #E85616;';
     } else {
       cls = 'text-zinc-700';
     }
@@ -2629,7 +4302,7 @@ function route() {
     }
     show('view-aluno'); loadAlunoData(); return;
   }
-  // v29.10.0: CONSOLE FERRO (somente leitura). E AQUI que mora a garantia de
+  // v30.0.0: CONSOLE FERRO (somente leitura). E AQUI que mora a garantia de
   // "nenhuma requisicao nova ao abrir a aba": sem dado em memoria, esta rota
   // NAO busca — devolve pro painel do aluno, que ja tem o fluxo de carga.
   if (h === '#console') {
@@ -3579,7 +5252,9 @@ function drawEvoChart(regs, suffix) {
     .filter(p => p.y != null)
     .sort((a, b) => a.d.localeCompare(b.d));
 
-  const PALETA = ['#EE5622', '#0E7490', '#7C3AED', '#10935E', '#C77400', '#DC2626'];
+  // ordem validada (skill dataviz): passa os pisos de CVD e de visao normal
+  // na lista adjacente, sobre a superficie escura #12171F.
+  const PALETA = ['#E85616', '#0598CE', '#09A66B', '#BE7C05', '#9276E2', '#EB4D45'];
   let labels, datasets;
 
   if (comparar) {
@@ -3620,13 +5295,13 @@ function drawEvoChart(regs, suffix) {
       if (empty) empty.classList.remove('hidden');
       return;
     }
-    const accent = '#EE5622';
+    const accent = '#E85616';
     labels = pts.map(p => fmtDate(p.d));
     datasets = [{
       label: 'carga (kg)',
       data: pts.map(p => p.y),
       borderColor: accent,
-      backgroundColor: 'rgba(238,86,34,0.10)',
+      backgroundColor: 'rgba(232,86,22,0.16)',
       fill: true,
       tension: 0.25,
       pointRadius: 4,
@@ -3680,8 +5355,8 @@ function drawEvoChart(regs, suffix) {
           tooltip: { displayColors: comparar }
         },
         scales: {
-          x: { ticks: { color: '#8B93A0', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: '#E7EAEE' } },
-          y: { ticks: { color: '#8B93A0', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: '#E7EAEE' }, beginAtZero: false }
+          x: { ticks: { color: '#98A2B1', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: 'rgba(36,44,56,0.9)' }, border: { color: '#242C38' } },
+          y: { ticks: { color: '#98A2B1', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: 'rgba(36,44,56,0.9)' }, border: { color: '#242C38' }, beginAtZero: false }
         }
       }
     });
@@ -3833,7 +5508,7 @@ function renderEvoHistorico(regs, containerId, isTrainer) {
     }
   });
   const bannerRot = alertasRot.length
-    ? `<div class="glass mb-2" style="border-color:rgba(199,116,0,0.45);background:#FBF0DB"><div class="px-3 py-2 mono text-[11px] text-amber-400">⚠ rotacao: ${alertasRot.join(' · ')}</div></div>`
+    ? `<div class="glass mb-2" style="border-color:rgba(190,124,5,0.55);background:rgba(190,124,5,0.14)"><div class="px-3 py-2 mono text-[11px] text-amber-400">⚠ rotacao: ${alertasRot.join(' · ')}</div></div>`
     : '';
 
   // OPTIMIZATION (Phase 3D): Lazy-load sessions - render only first 50, add "Load More"
@@ -4131,10 +5806,14 @@ function renderAlunoPlano() {
     div.innerHTML = '<div class="mono text-xs text-zinc-500 py-12 text-center glass">Sem exercicios neste dia ainda. Aguarde seu trainer.</div>';
     return;
   }
-  const cor = dayColorBg(day);
-  div.innerHTML = plano.map((p, i) => `
+  // v30: a barrinha por card virou um TRILHO continuo de brasa que corre
+  // por toda a lista — o calor atravessa de um card pro outro. Tudo CSS:
+  // 3 brasas descem por dentro do canal, sem JS e sem custo por card.
+  div.classList.add('fg-palco', 'fg-lista');
+  const trilho = `<div class="fg-trilho" aria-hidden="true">
+      <i class="fg-brasa"></i><i class="fg-brasa"></i><i class="fg-brasa"></i></div>`;
+  div.innerHTML = trilho + plano.map((p, i) => `
     <div class="glass p-4 relative">
-      <div class="absolute top-0 left-0 w-1 h-full ${cor}"></div>
       <div class="flex items-baseline justify-between mb-2 pl-2">
         <div class="flex items-baseline gap-3">
           <span class="mono text-xs text-zinc-500">${String(i+1).padStart(2,'0')}</span>
@@ -4304,7 +5983,9 @@ $('btn-aluno-historico').onclick = () => {
 const MAPA_GRUPOS = ['peito','ombro','triceps','costas','biceps','core','quadriceps','posterior','panturrilha'];
 const MAPA_LABEL = { peito:'Peito', ombro:'Ombro', triceps:'Triceps', costas:'Costas', biceps:'Biceps', core:'Core', quadriceps:'Quadriceps', posterior:'Posterior', panturrilha:'Panturrilha' };
 const MAPA_REC = { recuperando: 1, atrasado: 5 }; // dias: <=1 recuperando, >=5 atrasado, no meio = pronto
-const MAPA_COR = { pronto:'#10935E', recuperando:'#C77400', atrasado:'#DC2626', dim:'#DCE0E6' };
+// v30: verde/ambar/vermelho re-passados pra superficie escura; 'dim' vira
+// o neutro frio da paleta (musculo descansado = frio, treinado = quente).
+const MAPA_COR = { pronto:'#09A66B', recuperando:'#BE7C05', atrasado:'#EB4D45', dim:'#2A3340' };
 
 // v29.7.0: ficha do exercicio vinda do banco (tabela exercicios enriquecida
 // com dados curados + wger.de). Lookup por slug em nome_atual E aliases —
@@ -4338,6 +6019,40 @@ function musculosDoExercicio(nome) {
 // v29.8.1: chips de musculo primario (brasa) / secundario (cinza) / equipamento
 // (verde) — compartilhado entre o modal FICHA e o bloco COMO FAZER do TREINAR.
 // Cores via style inline (Tailwind pre-compilado, classe nova nao existe).
+// ===================================================================
+// v30: TRATAMENTO DAS ILUSTRACOES NO TEMA ESCURO
+// As 50 ilustracoes do banco tem fundo BRANCO, que no escuro vira um
+// bloco de luz no meio do card. Elas nao sao todas iguais, entao o
+// tratamento e por familia (classificacao feita medindo saturacao,
+// fracao de branco e rampa de cinza de cada arquivo):
+//   t = traco  (27) desenho de linha preto no branco -> invert + screen:
+//                   o fundo some por completo e sobra o traco aceso.
+//   r = render (15) render 3D cinza com musculo vermelho -> chapa clara.
+//                   NAO inverter: o corpo some e o vermelho vira ciano.
+//   f = foto   (8)  fotografia real -> chapa + vinheta.
+// Arquivo desconhecido cai em 'foto', que e o tratamento seguro: uma
+// chapa nunca destroi a imagem, o invert pode.
+// ===================================================================
+const IMG_FAMILIA = {"abdominal-infra-elevacao-pernas":"t","abdominal-remador":"r","abducao-maquina":"t","agachamento-halter-livre":"f","agachamento-smith":"f","cadeira-adutora":"t","cadeira-extensora":"r","cadeira-flexora":"t","crucifixo-invertido":"t","crucifixo-trave":"t","desenvolvimento-halter":"t","desenvolvimento-maquina":"t","elevacao-lateral-halter":"t","elevacao-lateral-maquina-ou-cross":"r","elevacao-pelvica":"t","esteira":"f","extensor-lombar":"r","extensora-unilateral":"r","face-pull":"f","flexora-unilateral":"t","hack-squat":"r","leg-press-45":"f","pallof-press":"r","panturrilha":"t","panturrilha-em-pe":"t","prancha":"f","puxada-frontal":"r","puxada-neutra":"r","remada-baixa-maquina":"r","remada-baixa-v":"r","remada-curvada":"t","remada-serrote":"r","rosca-alternada-halter":"f","rosca-alternada-martelo":"t","rosca-barra-w":"r","rosca-polia-baixa":"t","rosca-scott-maquina":"t","squat":"t","stiff-halter":"t","supino-declinado-barra":"t","supino-inclinado-barra":"t","supino-inclinado-halter":"t","supino-maquina":"r","supino-reto-barra":"t","terra":"f","triceps-corda":"r","triceps-frances":"t","triceps-maquina-paralela":"t","triceps-testa-no-cross":"t","voador-peck-deck":"t"};
+const IMG_CLASSE = { t: 'img-traco', r: 'img-render', f: 'img-foto' };
+
+function familiaDaIlustracao(url) {
+  const m = String(url || '').match(/\/([^\/?#]+)\.webp(?:[?#]|$)/i);
+  return IMG_CLASSE[m && IMG_FAMILIA[m[1].toLowerCase()]] || 'img-foto';
+}
+
+// Liga (ou apaga) a ficha ilustrada. fig = <figure class="img-ficha">.
+function pintarFicha(fig, img, url) {
+  if (!fig || !img) return;
+  fig.classList.remove('img-traco', 'img-render', 'img-foto');
+  if (!url) { fig.classList.add('hidden'); img.removeAttribute('src'); return; }
+  fig.classList.add(familiaDaIlustracao(url));
+  fig.classList.remove('hidden');
+  // so troca o src quando muda de exercicio - evita re-request e piscada
+  if (img.getAttribute('src') !== url) img.src = url;
+  if (window.ImgFicha && window.ImgFicha.ligar) window.ImgFicha.ligar(fig);
+}
+
 function fichaChipsHtml(info) {
   const chip = (txt, cor) =>
     `<span class="mono text-[10px] tracking-widest px-2 py-1 border" style="color:${cor};border-color:${cor}66">${escapeHtml(txt)}</span>`;
@@ -4357,9 +6072,7 @@ function abrirExInfo(nome) {
   $('exinfo-nome').textContent = String(info.nome_atual || nome).trim().toUpperCase();
   $('exinfo-musculos').innerHTML = fichaChipsHtml(info);
   $('exinfo-instrucoes').textContent = String(info.instrucoes || '');
-  const img = $('exinfo-img');
-  if (info.imagem_url) { img.classList.remove('hidden'); img.src = info.imagem_url; }
-  else { img.classList.add('hidden'); img.removeAttribute('src'); }
+  pintarFicha($('exinfo-fig'), $('exinfo-img'), info.imagem_url);
   // v29.8.2: credito wger SO quando o exercicio mapeia pra la (wger_id). Imagem
   // propria (ex: hack squat do usuario, wger_id null) nao leva credito do wger.
   $('exinfo-fonte').classList.toggle('hidden', !info.wger_id);
@@ -4432,11 +6145,11 @@ function mapaSugerirDia(status) {
 
 function mapaCorpoSVG(status) {
   const c = g => MAPA_COR[(status[g] && status[g].st) || 'dim'];
-  const S = 'stroke="#FFFFFF" stroke-width="1"';
+  const S = 'stroke="#0B0E13" stroke-width="1"';
   // v25: silhueta cheia (mesma frente/costas) + musculos por cima com contorno.
   // v29: silhueta clara (cinza-gelo) + separadores brancos p/ tema claro.
   const sil = `
-    <g fill="#EDF0F3" stroke="#DCE0E6" stroke-width="0.8">
+    <g fill="#1B2430" stroke="#323C4B" stroke-width="0.8">
       <circle cx="60" cy="20" r="12"/><rect x="55" y="29" width="10" height="7" rx="2"/>
       <rect x="40" y="44" width="40" height="74" rx="14"/><rect x="44" y="112" width="32" height="22" rx="9"/>
       <ellipse cx="24" cy="78" rx="9" ry="22"/><ellipse cx="96" cy="78" rx="9" ry="22"/>
@@ -4450,13 +6163,13 @@ function mapaCorpoSVG(status) {
     <path d="M62 50 h15 a5 5 0 015 5 v9 a5 5 0 01-5 5 h-15 a5 5 0 01-5 -5 v-9 a5 5 0 015 -5z" fill="${c('peito')}" ${S}/>
     <ellipse cx="24" cy="77" rx="8" ry="16" fill="${c('biceps')}" ${S}/><ellipse cx="96" cy="77" rx="8" ry="16" fill="${c('biceps')}" ${S}/>
     <rect x="51" y="78" width="18" height="34" rx="5" fill="${c('core')}" ${S}/>
-    <line x1="60" y1="80" x2="60" y2="110" stroke="#FFFFFF" stroke-width="0.8"/>
-    <line x1="52" y1="90" x2="68" y2="90" stroke="#FFFFFF" stroke-width="0.8"/><line x1="52" y1="100" x2="68" y2="100" stroke="#FFFFFF" stroke-width="0.8"/>
+    <line x1="60" y1="80" x2="60" y2="110" stroke="#0B0E13" stroke-width="0.8"/>
+    <line x1="52" y1="90" x2="68" y2="90" stroke="#0B0E13" stroke-width="0.8"/><line x1="52" y1="100" x2="68" y2="100" stroke="#0B0E13" stroke-width="0.8"/>
     <ellipse cx="50" cy="166" rx="11" ry="28" fill="${c('quadriceps')}" ${S}/><ellipse cx="70" cy="166" rx="11" ry="28" fill="${c('quadriceps')}" ${S}/>`;
   const costas = `
     <path d="M48 46 L72 46 L66 60 L54 60 Z" fill="${c('costas')}" ${S}/>
     <path d="M44 60 L58 63 L55 96 L46 84 Z" fill="${c('costas')}" ${S}/><path d="M76 60 L62 63 L65 96 L74 84 Z" fill="${c('costas')}" ${S}/>
-    <line x1="60" y1="58" x2="60" y2="112" stroke="#FFFFFF" stroke-width="0.8"/>
+    <line x1="60" y1="58" x2="60" y2="112" stroke="#0B0E13" stroke-width="0.8"/>
     <ellipse cx="24" cy="77" rx="8" ry="16" fill="${c('triceps')}" ${S}/><ellipse cx="96" cy="77" rx="8" ry="16" fill="${c('triceps')}" ${S}/>
     <ellipse cx="53" cy="124" rx="10" ry="11" fill="${c('posterior')}" ${S}/><ellipse cx="67" cy="124" rx="10" ry="11" fill="${c('posterior')}" ${S}/>
     <ellipse cx="50" cy="168" rx="11" ry="27" fill="${c('posterior')}" ${S}/><ellipse cx="70" cy="168" rx="11" ry="27" fill="${c('posterior')}" ${S}/>
@@ -4491,7 +6204,7 @@ function renderMapaMuscular() {
       <div class="text-sm text-zinc-400 mt-1">Registre suas sessoes pra eu colorir o mapa e dizer o que treinar.</div></div>`;
   } else {
     const foco = sug ? sug.grupos.map(g => MAPA_LABEL[g]).filter(Boolean).slice(0, 3).join(' · ') : '';
-    painel = `<div class="mt-4 rounded-2xl p-4" style="border:1px solid rgba(16,147,94,.35);background:#E4F4EC">
+    painel = `<div class="mt-4 rounded-2xl p-4" style="border:1px solid rgba(9,166,107,.45);background:rgba(9,166,107,.14)">
       <div class="mono text-[10px] tracking-widest mb-1" style="color:${MAPA_COR.pronto}">PRONTO PRA TREINAR</div>
       <div class="display text-3xl">TREINO ${sug ? sug.dia : '—'}</div>
       <div class="text-sm text-zinc-400 mt-1">${escapeHtml(foco)} recuperados.</div>
@@ -5200,15 +6913,7 @@ function mostrarExercicioAtual() {
     const instr = String(infoTr.instrucoes || '');
     instrEl.textContent = instr;
     instrEl.classList.toggle('hidden', !instr);
-    const fimg = $('treinar-ficha-img');
-    if (infoTr.imagem_url) {
-      fimg.classList.remove('hidden');
-      // so troca o src quando o exercicio muda — evita re-request/flicker
-      if (fimg.getAttribute('src') !== infoTr.imagem_url) fimg.src = infoTr.imagem_url;
-    } else {
-      fimg.classList.add('hidden');
-      fimg.removeAttribute('src');
-    }
+    pintarFicha($('treinar-ficha-fig'), $('treinar-ficha-img'), infoTr.imagem_url);
     $('treinar-ficha-fonte').classList.toggle('hidden', !infoTr.wger_id); // v29.8.2: so credita wger com wger_id
     elFicha.classList.remove('hidden');
   } else {
@@ -5786,7 +7491,7 @@ async function mostrarBackendVer() {
 }
 
 // ===========================================================================
-// v29.10.0: CONSOLE FERRO — visao nova, SOMENTE LEITURA (#console)
+// v30.0.0: CONSOLE FERRO — visao nova, SOMENTE LEITURA (#console)
 // ---------------------------------------------------------------------------
 // CONTRATO DESTA ILHA, em uma linha: ela NAO faz requisicao nenhuma.
 // Tudo que ela desenha sai de APP.data, o payload do getAluno que ja esta em
@@ -5885,11 +7590,13 @@ function frcRegistros() {
     const forca = !cardio && DAYS.includes(dia);
     return {
       r: r,
-      // dataSessao() ja resolve DD/MM/YYYY e YYYY-MM-DD. O frcIsoValido em
-      // cima dele NAO e paranoia: dataLocalIso() cai num slice(0,10) quando
-      // nao consegue parsear, entao um timestamp corrompido (ha registros
-      // legados assim, ver HANDOFF_FASE6) virava uma pseudo-data que ordena
-      // como string, sequestrava a "ultima vez" do dia e quebrava a rotacao.
+      // dataSessao() ja resolve DD/MM/YYYY e YYYY-MM-DD, e desde a v30.0.0
+      // devolve '' (em vez de um slice(0,10) de lixo) quando o timestamp e
+      // imparseavel - ha registros legados assim, ver HANDOFF_FASE6.
+      // O frcIsoValido em cima dele continua NAO sendo paranoia: ele tambem
+      // valida FAIXA (mes 1-12, dia 1-31), coisa que nem o ramo `bare` do
+      // dataLocalIso nem o dataTreinoLimpa fazem - "2026-13-45" passa por
+      // aqueles dois e so morre aqui.
       _iso: frcIsoValido(dataSessao(r)),
       _dia: dia,
       _slug: slugify(r.exercicio),
@@ -6687,6 +8394,136 @@ $('btn-aluno-console').onclick = () => navigateTo('#console');
   setTimeout(tentarSincronizarPendentes, 1500);
 })();
 
+
+/* ============ v30 · ciclo de vida da ficha ilustrada ============ */
+/* ============================================================================
+   FORJA · estados da ficha de imagem (prefixo img-)
+   Sem biblioteca, sem fetch. So load/error na propria <img>.
+   API: window.ImgFicha.ligar(raiz) — chame depois de renderizar a lista.
+   E idempotente: ficha ja ligada e ignorada.
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var PRONTA = 'img-e-pronta';
+  var CARGA  = 'img-e-carregando';
+  var FALHA  = 'img-e-falha';
+
+  function marcar(fig, cls) {
+    fig.classList.remove(PRONTA, CARGA, FALHA);
+    fig.classList.add(cls);
+  }
+
+  function ligarFicha(fig) {
+    if (!fig || fig.getAttribute('data-img-ligada') === '1') return;
+
+    var papel = fig.getAttribute('data-img-demo');
+    // "cru" = exemplo ANTES: fica como esta hoje, sem estados
+    if (papel === 'cru') { fig.setAttribute('data-img-ligada', '1'); return; }
+    // "travada" = vitrine do esqueleto, nao tem imagem pra esperar
+    if (papel === 'travada') { fig.setAttribute('data-img-ligada', '1'); marcar(fig, CARGA); return; }
+
+    var art = fig.querySelector('.img-arte');
+    if (!art) return;
+    fig.setAttribute('data-img-ligada', '1');
+
+    // NUNCA lazy: dentro de container position:fixed o Chrome pode nao
+    // disparar o load e a ficha trava no esqueleto pra sempre.
+    art.removeAttribute('loading');
+    art.setAttribute('decoding', 'async');
+    if (!art.getAttribute('data-img-src')) {
+      art.setAttribute('data-img-src', (art.getAttribute('src') || '').split('?')[0]);
+    }
+
+    // sem {once}: a nova tentativa reusa os mesmos listeners
+    art.addEventListener('load', function () {
+      marcar(fig, art.naturalWidth > 0 ? PRONTA : FALHA);
+    });
+    art.addEventListener('error', function () { marcar(fig, FALHA); });
+
+    // src vazio nunca dispara nada: e falha na hora
+    if (!(art.getAttribute('src') || '').trim()) { marcar(fig, FALHA); return; }
+
+    // imagem vinda do cache ja terminou e nao dispara load de novo
+    if (art.complete) {
+      marcar(fig, art.naturalWidth > 0 ? PRONTA : FALHA);
+      return;
+    }
+    marcar(fig, CARGA);
+  }
+
+  function ligar(raiz) {
+    var alvo = raiz || document;
+    var lista = alvo.querySelectorAll('.img-ficha');
+    for (var i = 0; i < lista.length; i++) ligarFicha(lista[i]);
+  }
+
+  function tentarDeNovo(fig) {
+    var art = fig.querySelector('.img-arte');
+    if (!art) return;
+    var base = art.getAttribute('data-img-src') || (art.getAttribute('src') || '').split('?')[0];
+    if (!base) return;
+    marcar(fig, CARGA);
+    art.src = base + '?r=' + Date.now(); // fura o cache negativo
+  }
+
+  // clique no fallback de erro = nova tentativa (delegado, 1 listener so)
+  document.addEventListener('click', function (ev) {
+    var alvo = ev.target && ev.target.closest ? ev.target.closest('[data-img-tentar]') : null;
+    if (!alvo) return;
+    var fig = alvo.closest('.img-ficha');
+    if (fig) tentarDeNovo(fig);
+  });
+
+  /* ---- controles da DEMONSTRACAO (nao vao pro app) ---------------------- */
+  var FUNDOS = [['grad', 'GRADIENTE'], ['s2', '#171E28'], ['s1', '#12171F']];
+
+  function ligarDemo() {
+    var demo = document.getElementById('img-demo');
+    if (!demo) return;
+    var passo = 0;
+
+    demo.addEventListener('click', function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest('[data-img-acao]') : null;
+      if (!btn) return;
+      var acao = btn.getAttribute('data-img-acao');
+
+      if (acao === 'fundo') {
+        passo = (passo + 1) % FUNDOS.length;
+        demo.setAttribute('data-fundo', FUNDOS[passo][0]);
+        var val = btn.querySelector('.img-val');
+        if (val) val.textContent = FUNDOS[passo][1];
+        return;
+      }
+
+      var lig = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', lig ? 'true' : 'false');
+
+      // ancestral hostil: isolation no palco (mesmo efeito de transform,
+      // opacity<1, filter ou will-change num pai). Com a placa blindada,
+      // o resultado nao muda em nada.
+      if (acao === 'hostil') demo.classList.toggle('img-hostil', lig);
+
+      // placa desligada = como era antes: o blend depende do card e,
+      // sob ancestral hostil, aparece o retangulo preto.
+      if (acao === 'placa') {
+        demo.classList.toggle('img-sem-placa', !lig);
+        var rot = btn.querySelector('b');
+        if (rot) rot.textContent = lig ? 'blindada' : 'desligada';
+      }
+    });
+  }
+
+  function iniciar() { ligar(document); ligarDemo(); }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciar);
+  } else {
+    iniciar();
+  }
+
+  window.ImgFicha = { ligar: ligar, ligarFicha: ligarFicha, tentarDeNovo: tentarDeNovo };
+}());
 </script>
 </body>
 </html>

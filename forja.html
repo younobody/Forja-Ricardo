@@ -1,4 +1,102 @@
-<!-- FORJA v30.0.0 - BRASA ESCURO (tema novo do app inteiro)
+<!-- FORJA v30.2.0 - PACOTE TREINAR AGORA + BUGFIX DO TETO DE CARGA
+     Cinco pedidos do aluno, todos na mesma tela, mais um bug de seguranca.
+
+     0) BUGFIX - A SUGESTAO DE CARGA IGNORAVA O TETO DO PLANO.
+     Em 24/08/26 a tela ofereceu "SUGESTAO: 37,5kg" pro FACE PULL, cuja obs
+     diz "teto de carga 30kg, progride so em reps. Carro-chefe postural".
+     Acima de 30kg o trapezio assume e a rotacao externa some - o app empurrou
+     carga contra o proprio objetivo postural do plano. Eram DOIS defeitos
+     somados:
+       (a) sugestaoProgressao lia p.meta e nunca p.obs, que e onde todo teto
+           de carga mora. Agora ha parser (tetoDeCargaDaObs). O que ele NAO
+           pode casar importa tanto quanto o que casa: "TETO RIR 2" e teto de
+           RIR, "TETO 90 GRAUS ... CARGA progride livre dentro do teto (ja foi
+           60>80kg assim)" e teto de AMPLITUDE, "Travar em 15 reps" e teto de
+           REPS. A regra que separa: entre "teto" e o numero so pode haver
+           conectivo, e o numero tem que terminar em kg.
+       (b) o heuristico bateuReps se deixava enganar pelo proprio jeito dele
+           registrar. Ele loga a FAIXA do plano no campo reps ("15-20",
+           identica a do plano) e as reps reais na obs ("15/15/15"). O ramo
+           "fechou && ult.reps === p.reps" dava TRUE porque "15-20" ===
+           "15-20": o app concluia "bateu as 20 reps" com a prova do contrario
+           na mesma linha. Isso valia pra TODO exercicio, nao so o face pull.
+     PRINCIPIO DOS DOIS PARSERS: so podem VETAR uma subida, nunca autorizar.
+     Falso positivo entao no maximo segura a carga - o lado barato de errar.
+     Tipos novos de sugestao: 'teto' (esta no teto, ambar) e 'teto-acima'
+     (estourou, vermelho de falta). Os TRES consumidores foram atualizados -
+     o card do TREINAR, a linha do modal LANCAR SESSAO e o mapa de cores de
+     cada um; sem isso o alerta mais importante da tela sairia cinza.
+
+     1) NAO DAVA PRA VER A LISTA DO DIA. Durante a sessao dava pra ver o
+     ESTADO de cada exercicio (a fileira de quadradinhos) mas nao o NOME: pra
+     saber o que vinha depois, so clicando PROXIMO/ANTERIOR. Agora a fileira
+     virou UM botao que abre a LISTA DO DIA, com nome, alvo, estado e selo de
+     troca/extra. Os quadradinhos eram BOTAO de 16px com title=: alvo menor
+     que metade dos 44px minimos, e no celular title nao aparece no toque -
+     viraram indicador puro. Em tela >= 1240px a gaveta vira coluna fixa.
+     atualizarStatusBar() continua sendo o UNICO ponto de render de status e
+     chama renderListaDia(), entao os 6 chamadores antigos redesenham a lista
+     de graca, sem caso especial pra extra nem pra troca.
+
+     2) TROCAR SO APARECIA EM 2 EXERCICIOS. GRUPOS_EQUIV tem dois grupos
+     escritos a mao, e o botao so aparecia se o exercicio casasse com um
+     deles - na pratica, quase nunca. Trocar virava "adicionar extra + marcar
+     faltei": dois passos e um registro de falta que nao aconteceu. Agora
+     TROCAR aparece sempre (menos em exercicio ja salvo) e o modal tem tres
+     camadas: equivalentes fixos, sugestao automatica por musculo primario
+     (tabela de fichas, com o motivo visivel e desempate pelo secundario -
+     sem ele "Elevacao lateral" empatava com "Crucifixo invertido" pro face
+     pull) e campo de texto livre. Teto de 6 sugestoes: abaixo delas ainda tem
+     o campo de escrever, e o pedido era justamente poder escrever.
+
+     3) O REGISTRO NAO DIZIA O QUE FOI TROCADO. O nome do substituto ja ia
+     pro campo exercicio desde a v26, mas no historico o exercicio do plano
+     simplesmente sumia do dia - sem como saber se foi troca ou falta. A obs
+     do registro agora recebe "X trocado por Y" na frente do que ele escreveu
+     (prepend, nunca overwrite; nao duplica se a frase ja estiver la).
+
+     4) LAYOUT MOBILE. Seis correcoes, a maior delas o ZOOM AUTOMATICO: a base
+     de input era 0.875rem = 14px e o iOS da zoom na pagina inteira quando um
+     campo com fonte menor que 16px recebe foco, sem desfazer depois. Tambem:
+     100dvh no body, safe-area no rodape do TREINAR (a barra de gestos comia
+     FALTEI/FECHEI), nome do exercicio em linha propria abaixo de 430px,
+     modal alinhado no topo pra nao sumir atras do teclado, e tracking menor
+     nos labels abaixo de 380px. Tudo em CSS proprio com @media: o Tailwind
+     deste arquivo e PRE-COMPILADO e so tem 7 variantes responsivas.
+
+     5) O DATALIST DO EXTRA SO CONHECIA O PLANO. Um nome digitado a mao nunca
+     voltava a aparecer: no treino seguinte era digitar tudo de novo, em pe,
+     entre series. Agora sao 4 fontes, TODAS ja em memoria (zero rede, roda
+     offline): tabela de fichas (nome_atual + aliases, grafia curada com
+     acento), o plano, uma lista MRU local deste celular e os registros do
+     historico. A lista local existe pra tapar o unico buraco que as outras
+     tres nao tapam: "adicionei agora, ainda nao sincronizou" - o nome so vira
+     historico depois do flush do buffer. Dedupe por slugify() (mata acento,
+     caixa e espaco sobrando: "Face pull" e "face pull " sao um nome so) e
+     ordem por RECENCIA, porque o datalist do Chrome respeita a ordem do DOM.
+     O resto sai alfabetico com localeCompare('pt-BR') - no sort() cru, por
+     code point, "Abdutora" com acento cai DEPOIS de "Zerchers".
+
+     6) NAO HAVIA COMO REMOVER EXERCICIO DA SESSAO. Novo botao ✕ REMOVER, ao
+     lado do ⇄ TROCAR. Vale SO pra exercicio EXTRA (campo _extra no item):
+     apagar item do PLANO seria outra coisa - o plano e do trainer e "nao vou
+     fazer" ja tem dois caminhos (✗ FALTEI, que registra a falta, e a
+     navegacao livre, que so nao passa por ele). O _extra NAO vaza pro banco:
+     salvarRegistroAtual monta o payload campo a campo, nunca faz spread do
+     item do plano.
+     ARMADILHA QUE VIROU TRAVA: exercicio JA registrado nesta sessao nao se
+     remove. O registro foi pro buffer local no ato e pode ja estar no
+     servidor (o envio e em segundo plano, sem confirmacao na tela) - sumir
+     com ele da lista deixaria um registro fantasma no historico e o aluno
+     achando que apagou. Bloqueia e manda pro lugar que apaga de verdade
+     (EVOLUCAO & HISTORICO). Remover reindexa TODOS os arrays paralelos do
+     TREINAR (plano, statuses, localIds, salvos, substituto) e corrige o idx;
+     resultados NAO e paralelo (log append-only do resumo) e nunca tem entrada
+     pra um indice removivel, porque salvo nao chega ate aqui.
+     Numero 30.2.0 e proposital: a v30.1.0 segue reservada pras 4 pecas do
+     roadmap (mapa anatomico, progressao SVG, calendario, icones).
+
+     FORJA v30.0.0 - BRASA ESCURO (tema novo do app inteiro)
      Virada visual completa: o app sai do papel branco-frio da v29 e vira
      forja - carvao, aco e brasa. Nao e so inverter cor: a paleta foi
      VALIDADA por script (contraste WCAG, separacao sob daltonismo e piso de
@@ -455,7 +553,11 @@
   /* BASE v30 BRASA: carvao + brasa acesa no alto da tela */
   body {
     margin: 0;
+    /* v30.2.0: 100vh no celular e a altura com a barra do navegador RECOLHIDA.
+       Com ela na tela sobra menos, e o fundo fixo "pula" quando ela some. dvh
+       acompanha; a linha 100vh fica antes como fallback pra quem nao tem dvh. */
     min-height: 100vh;
+    min-height: 100dvh;
     position: relative;
     background:
       radial-gradient(120% 55% at 50% -10%, rgba(255,107,51,0.13) 0%, rgba(255,107,51,0) 62%),
@@ -2066,6 +2168,211 @@
   /* ficha de exercicio: a placa pinta o tom do card onde ela vive */
   #treinar-ficha-fig, #exinfo-fig { --img-fundo-local: #171E28; margin: 0; }
 
+  /* ==================================================================
+     v30.2.0: LISTA DO DIA (prefixo .tl-, de Treino-Lista)
+     Por que existe: durante a sessao dava pra ver o ESTADO de cada
+     exercicio (a fileira de quadradinhos), mas nao o NOME. Pra saber o
+     que vinha depois so clicando PROXIMO/ANTERIOR - e quem esta em pe
+     entre series quer olhar a lista inteira e decidir a ordem na hora
+     (aparelho ocupado, tempo curto).
+     Os quadradinhos de 16px eram BOTAO com title=: alvo menor que
+     metade do minimo de 44px, e no celular title nao aparece no toque.
+     Viraram indicador puro (span, sem clique) dentro de UM botao grande
+     que abre a gaveta. Quem navega agora e a lista, com nome legivel.
+     "Na lateral" (pedido) nao cabe como coluna num celular de 360px:
+     ate 1239px e gaveta que desliza da direita; de 1240px pra cima ela
+     vira coluna fixa e some o veu - a mesma marcacao serve os dois.
+     ================================================================== */
+  .tl-strip {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 44px; padding: 8px 10px; margin-bottom: 1rem;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 3px; cursor: pointer; text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tl-strip:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .tl-strip-lbl {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: .12em; color: var(--text-dim); flex: none;
+  }
+  .tl-strip-segs { display: flex; gap: 3px; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  .tl-seg {
+    flex: 1 1 6px; min-width: 6px; max-width: 26px; height: 10px;
+    border-radius: 1px; background: var(--vazio);
+  }
+  .tl-seg-fez    { background: var(--ok); }
+  .tl-seg-faltou { background: var(--falta); }
+  .tl-seg-pulou  { background: var(--border-hot); }
+  .tl-seg-afazer { background: var(--vazio); }
+  /* EXTRA e diferenca de FORMA (risco em brasa embaixo), nao so de cor:
+     a regra de desenho da v30 nao deixa identidade depender de cor. */
+  .tl-seg-extra  { box-shadow: inset 0 -3px 0 0 var(--acc); }
+  /* envio pendente: o registro esta no buffer local, ainda nao subiu */
+  .tl-seg-envio  { opacity: .55; }
+  .tl-seg-atual  { outline: 2px solid var(--acc-ink); outline-offset: 1px; }
+
+  /* ---- veu + gaveta ---- */
+  .tl-veu {
+    position: fixed; inset: 0; z-index: 44; display: none;
+    background: rgba(11,14,19,.72); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .tl-on .tl-veu { display: block; }
+  .tl-gaveta {
+    position: fixed; z-index: 45; top: 0; right: 0; bottom: 0;
+    width: min(86vw, 380px);
+    display: flex; flex-direction: column;
+    background: var(--bg-soft); border-left: 1px solid var(--border-hot);
+    transform: translate3d(100%, 0, 0);
+    transition: transform .18s ease-out;
+    /* a gaveta e sempre montada: aria-hidden + inert nao existem aqui, entao
+       visibility tira ela da ordem de tabulacao enquanto esta fechada. */
+    visibility: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tl-on .tl-gaveta { transform: translate3d(0, 0, 0); visibility: visible; }
+  .tl-cab {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 12px 12px; border-bottom: 1px solid var(--line);
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  }
+  .tl-cab-dia { font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 1; }
+  .tl-cab-tit { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                letter-spacing: .12em; color: var(--text-dim); }
+  .tl-cab-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                letter-spacing: .04em; color: var(--text-faint); margin-top: 2px; }
+  .tl-fechar {
+    margin-left: auto; flex: none; min-width: 44px; min-height: 44px;
+    background: none; border: 1px solid var(--line); border-radius: 2px;
+    color: var(--text); font-size: 16px; cursor: pointer;
+  }
+  .tl-fechar:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .tl-itens { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 0; padding: 6px; }
+  .tl-item { list-style: none; }
+  .tl-linha {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 56px; padding: 8px 10px; text-align: left;
+    background: none; border: 0; border-bottom: 1px solid var(--line);
+    color: var(--text); cursor: pointer;
+  }
+  .tl-linha:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+  .tl-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-faint); flex: none; width: 20px; font-variant-numeric: tabular-nums;
+  }
+  .tl-meio { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .tl-nome { font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+  .tl-alvo {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-faint); overflow-wrap: anywhere;
+  }
+  .tl-marca {
+    flex: none; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: .08em; color: var(--text-faint); text-align: right;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tl-marca b { font-size: 12px; font-weight: 400; }
+  /* glifo + palavra andam juntos: o estado nunca depende so da cor */
+  .tl-e-fez    .tl-marca { color: var(--ok-ink); }
+  .tl-e-faltou .tl-marca { color: var(--falta); }
+  .tl-e-pulou  .tl-marca { color: var(--text-faint); }
+  .tl-e-fez    .tl-nome  { color: var(--text-dim); }
+  .tl-e-atual  { background: var(--acc-soft); }
+  .tl-e-atual .tl-nome { color: var(--acc-ink); }
+  .tl-selo {
+    display: inline-block; margin-left: 6px; padding: 1px 5px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .06em;
+    border: 1px solid currentColor; border-radius: 2px; vertical-align: middle;
+  }
+  .tl-selo-troca { color: var(--cardio); }
+  .tl-selo-extra { color: var(--acc-ink); }
+
+  /* ---- tela larga: a gaveta vira coluna fixa e o treino recua ---- */
+  @media (min-width: 1240px) {
+    #view-treinar .tl-gaveta {
+      transform: none; visibility: visible;
+      border-left: 1px solid var(--line);
+      background: transparent;
+    }
+    #view-treinar .tl-veu { display: none !important; }
+    #view-treinar .tl-fechar { display: none; }
+    #view-treinar > main { padding-right: 400px; }
+    .tl-strip { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tl-gaveta { transition: none !important; }
+  }
+
+  /* ==================================================================
+     v30.2.0: CORRECOES DE LAYOUT MOBILE
+     Alvo real: Android 360-414px de largura, em pe, entre series, uma mao.
+     Lembrete pra quem mexer aqui: o Tailwind deste arquivo e PRE-COMPILADO.
+     Variante responsiva que nao esta no bundle NAO EXISTE — as unicas que
+     existem sao sm:col-span-3, sm:grid-cols-3, md:col-span-2, md:grid-cols-2,
+     md:grid-cols-4, md:text-8xl e lg:grid-cols-3. Por isso tudo aqui e CSS
+     proprio com @media, e nao classe nova no markup.
+     ================================================================== */
+
+  /* --- 1. ZOOM AUTOMATICO AO FOCAR CAMPO (o defeito mais sentido) ---
+     iOS Safari da zoom na PAGINA INTEIRA quando um input com fonte menor que
+     16px recebe foco, e depois nao desfaz: fica tudo grande e torto ate o
+     usuario dar pinch de volta. A base do app e 0.875rem = 14px, entao isso
+     acontecia em TODO campo de texto (OBS, DATA, PIN, nome do exercicio
+     extra). 16px e o limiar exato do WebKit, nao um arredondamento.
+     Nao afeta CARGA/REPS/RIR: aqueles tem .text-2xl e classe ganha de
+     seletor de elemento na cascata. */
+  @media (max-width: 767px) {
+    input, textarea, select { font-size: 16px; }
+  }
+
+  /* --- 2. BARRA DE GESTOS COMENDO OS BOTOES ---
+     O app declara viewport-fit=cover, entao o conteudo vai ate embaixo de
+     tudo — inclusive atras da barra de gestos do Android e do iPhone. Na tela
+     do TREINAR quem fica la e justamente FALTEI/FECHEI e ANTERIOR/PROXIMO. */
+  #view-treinar > main {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* --- 3. NOME DO EXERCICIO ESPREMIDO CONTRA OS BOTOES ---
+     O nome e .display .text-4xl (36px) e divide a linha com TROCAR e, desde a
+     v30.2.0, tambem com REMOVER. Em 360px sobra pouco pro nome: "Elevacao
+     lateral maquina ou cross" virava uma coluna de silabas. Abaixo de 430px o
+     nome ocupa a linha inteira e os botoes descem pra linha de baixo. */
+  @media (max-width: 429px) {
+    #treinar-exercicio-nome { font-size: 1.875rem; line-height: 1.1; }
+    #view-treinar .flex.items-start.justify-between.gap-3.mb-2 { flex-wrap: wrap; }
+    #view-treinar .flex.items-start.justify-between.gap-3.mb-2 > div:first-child { flex: 1 1 100%; }
+  }
+
+  /* --- 4. MODAL SUMINDO ATRAS DO TECLADO ---
+     Os modais centralizam com flex align-items:center dentro de inset:0. Com o
+     teclado aberto o viewport LAYOUT nao encolhe (so o visual), entao a caixa
+     continua centralizada na tela inteira e metade dela fica atras do teclado —
+     justo onde estao o campo e os botoes. Alinhar no topo e poder rolar
+     resolve sem depender de VisualViewport API. */
+  #modal-extra-exercicio {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding-top: max(3rem, env(safe-area-inset-top, 0px));
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+  }
+  #modal-trocar > div { padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px)); }
+
+  /* --- 5. LABEL DE CAMPO CORTADO EM 360px ---
+     "RIR FINAL" e "DATA DO TREINO (opcional, padrao hoje)" sao mono 10px com
+     letter-spacing .1em dentro de uma coluna de ~100px. O tracking e o que
+     estoura; tirar so ele ja faz caber, sem mexer no tamanho da fonte. */
+  @media (max-width: 379px) {
+    #view-treinar label.mono { letter-spacing: .04em; }
+  }
+
+  /* --- 6. SCROLL HORIZONTAL DA PAGINA ---
+     Tabela larga (plano do trainer, historico) empurrava o BODY pra rolar de
+     lado: a tela inteira desliza e o cabecalho sai do lugar. Rolar dentro do
+     proprio container e o certo. O body ja tem overflow-x:hidden; aqui e o
+     par que faz o container assumir a rolagem. */
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+  table { max-width: 100%; }
+
 </style>
 
 <style id="console-css">
@@ -3051,12 +3358,33 @@
 
   <main class="max-w-2xl mx-auto px-4 py-6">
     <!-- Status por exercicio: tap pra navegar, cor mostra estado -->
-    <div id="treinar-status-bar" class="flex gap-1.5 mb-4 flex-wrap"></div>
+    <!-- v30.2.0: a fileira de quadradinhos virou UM botao que abre a LISTA DO
+         DIA. Os segmentos continuam (leitura de relance da sessao inteira),
+         mas agora sao indicador puro: quem navega e a lista, com o nome de
+         cada exercicio. Antes cada quadradinho era um botao de 16px com
+         title= — alvo pequeno demais pra usar em pe e title nao aparece no
+         toque. O innerHTML e montado por atualizarStatusBar(). -->
+    <button id="treinar-status-bar" type="button" class="tl-strip"
+            onclick="abrirListaDia()" aria-expanded="false"
+            aria-controls="treinar-lista" title="Ver todos os exercicios do dia"></button>
 
     <div class="flex items-start justify-between gap-3 mb-2">
       <div id="treinar-exercicio-nome" class="display text-4xl text-zinc-100 leading-tight">—</div>
-      <!-- v26: trocar exercicio flexivel por equivalente (so nesta sessao) -->
-      <button id="btn-treinar-trocar" type="button" onclick="abrirTrocaExercicio()" class="btn hidden shrink-0 mt-1 px-3 py-2 text-xs text-cyan-300 border-cyan-700/50 whitespace-nowrap">⇄ TROCAR</button>
+      <!-- v30.2.0: TROCAR e REMOVER dividem a coluna da direita. O wrapper
+           existe porque o pai e justify-between: com 3 filhos diretos o nome
+           ficaria espremido no meio. shrink-0/mt-1 subiram do botao pro
+           wrapper - mesmo efeito visual, um filho so. -->
+      <div class="flex items-center gap-2 shrink-0 mt-1">
+        <!-- v26: trocar exercicio flexivel por equivalente (so nesta sessao) -->
+        <button id="btn-treinar-trocar" type="button" onclick="abrirTrocaExercicio()" class="btn hidden px-3 py-2 text-xs text-cyan-300 border-cyan-700/50 whitespace-nowrap">⇄ TROCAR</button>
+        <!-- v30.2.0: REMOVER so aparece em exercicio EXTRA (mostrarExercicioAtual
+             liga/desliga pelo p._extra). Zero classe inventada: text-red-400 e
+             border-red-700 existem no bundle Tailwind PRE-compilado E na camada
+             de override v30, que as remapeia pro vermelho "falta" da paleta
+             (#EB4D45 / #8F2A24). Altura minima de 44px vem do .btn - o app e
+             usado em pe, entre series. -->
+        <button id="btn-treinar-excluir" type="button" onclick="excluirExercicioAtual()" class="btn hidden px-3 py-2 text-xs text-red-400 border-red-700 whitespace-nowrap">✕ REMOVER</button>
+      </div>
     </div>
     <div id="treinar-substituido" class="hidden mono text-[10px] text-cyan-400 tracking-widest mb-2"></div>
     <div id="treinar-ja-salvo" class="hidden mono text-[10px] text-emerald-400 tracking-widest mb-2">✓ JA REGISTRADO NESTA SESSAO — mostrando o que voce salvou</div>
@@ -3165,6 +3493,23 @@
       </div>
     </div>
   </div>
+
+  <!-- v30.2.0: LISTA DO DIA. Fica dentro de #view-treinar de proposito: a
+       classe .tl-on mora no proprio view, entao sair do TREINAR ja fecha a
+       gaveta sem codigo nenhum. Em tela >= 1240px o CSS transforma isso numa
+       coluna fixa e esconde o veu. -->
+  <div class="tl-veu" onclick="fecharListaDia()"></div>
+  <aside id="treinar-lista" class="tl-gaveta" aria-label="Exercicios do dia">
+    <div class="tl-cab">
+      <span id="treinar-lista-dia" class="tl-cab-dia">—</span>
+      <span>
+        <span class="tl-cab-tit">LISTA DO DIA</span>
+        <span id="treinar-lista-sub" class="tl-cab-sub block"></span>
+      </span>
+      <button type="button" class="tl-fechar" onclick="fecharListaDia()" aria-label="Fechar a lista">✕</button>
+    </div>
+    <ol id="treinar-lista-itens" class="tl-itens"></ol>
+  </aside>
 
   <!-- v19: overlay de descanso opcional entre exercicios -->
   <div id="treinar-rest-overlay" class="hidden fixed inset-0 bg-zinc-950/95 backdrop-blur-sm z-40 flex items-center justify-center">
@@ -3286,8 +3631,23 @@
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
     </div>
-    <div class="mono text-[11px] text-zinc-500 mb-4 leading-relaxed">Escolha um exercicio equivalente. A troca vale so pra este treino — seu plano nao muda. O registro grava o nome do substituto.</div>
+    <div class="mono text-[11px] text-zinc-500 mb-4 leading-relaxed">A troca vale so pra este treino — seu plano nao muda. O registro grava o nome do substituto e a obs recebe "X trocado por Y", pro trainer ver o que voce fez.</div>
     <div id="trocar-opcoes" class="space-y-2"></div>
+    <!-- v30.2.0: sugestao automatica por musculo. Sai da tabela de fichas
+         (musculos_primarios), entao so aparece pra exercicio cadastrado. -->
+    <div id="trocar-sugeridos-bloco" class="hidden mt-6">
+      <div class="mono text-[10px] text-zinc-500 tracking-widest mb-2">COMPATIVEIS · MESMO MUSCULO</div>
+      <div id="trocar-sugeridos" class="space-y-2"></div>
+    </div>
+    <!-- v30.2.0: o caso "nao tem na lista, eu escrevo". Mesmo datalist do
+         exercicio extra, entao o que ele ja treinou aparece ao digitar. -->
+    <!-- padding-top inline: .pt-4 NAO existe no bundle Tailwind pre-compilado
+         deste arquivo (so .pt-2), entao a classe seria ignorada em silencio. -->
+    <div class="mt-6 border-t border-zinc-800" style="padding-top:1rem;">
+      <div class="mono text-[10px] text-zinc-500 tracking-widest mb-2">OUTRO · ESCREVER O NOME</div>
+      <input id="trocar-livre-input" list="lista-exercicios-conhecidos" placeholder="Nome do exercicio..." class="w-full mb-3" autocomplete="off" />
+      <button type="button" onclick="trocarPorTextoLivre()" class="btn btn-primary w-full py-3">⇄ TROCAR POR ESTE</button>
+    </div>
   </div>
 </div>
 
@@ -3642,7 +4002,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v30.0.0';
+const FORJA_VERSION = 'v30.2.0';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao
@@ -6695,8 +7055,78 @@ function registroFechou(r) {
   return !(s === 'false' || s === 'nao' || s === 'no' || s === '0');
 }
 
+// ===== v30.2.0: TETO DE CARGA (bugfix) ====================================
+// O QUE ACONTECEU: no dia 24/08/26 a tela ofereceu "SUGESTAO: 37,5kg" pro FACE
+// PULL, cuja obs do plano diz, com todas as letras, "teto de carga 30kg,
+// progride so em reps. Carro-chefe postural". Ou seja: o app empurrou carga
+// num exercicio POSTURAL com teto explicito. Acima de 30kg o trapezio assume e
+// a rotacao externa some - e exatamente o que o exercicio existe pra treinar.
+// Isso e erro de seguranca, nao cosmetico.
+//
+// A CAUSA: sugestaoProgressao lia p.meta (alvo de 1 ano) e nunca p.obs. Todo o
+// teto de carga do plano mora na obs, escrito em texto livre pelo trainer.
+//
+// PRINCIPIO QUE VALE PROS DOIS PARSERS ABAIXO: o que sai daqui so pode VETAR
+// uma subida de carga, NUNCA autorizar. Um falso positivo entao no maximo
+// segura a carga - que e o lado barato de errar num app de treino.
+//
+// Formatos REAIS no banco (levantados por SQL sobre plano.obs, nao inventados):
+//   "teto de carga 30kg, progride so em reps. Carro-chefe postural"      -> 30
+//   "TETO DE CARGA em 30kg. ... Progride SO em reps ate 3x20 limpo. ..." -> 30
+//   "para na linha do ombro. Travado em 25kg: priorizar controle ..."    -> 25
+// E os que NAO sao teto de CARGA e nao podem casar (falso positivo aqui e pior
+// que nao achar nada, porque trava um exercicio que devia progredir):
+//   "TETO RIR 2 - epicondilite medial. ..."               -> teto de RIR
+//   "TETO 90 GRAUS PERMANENTE ... CARGA progride livre dentro do teto
+//    (ja foi 60>80kg assim)"                              -> teto de AMPLITUDE
+//   "Travar em 15 reps, nao deixar passar"                -> teto de REPS
+//   "subiu de 40kg em 31/07 apos ~10 semanas travado"     -> so historico
+// A regra que separa os dois grupos: entre a palavra "teto" e o numero so pode
+// haver conectivo ("de carga", "em", ":"), nunca palavra solta, e o numero tem
+// que terminar em kg. E isso que faz o hack squat escapar - la o "(" quebra o
+// casamento e "90 GRAUS" nao termina em kg.
+function tetoDeCargaDaObs(obs) {
+  const t = String(obs == null ? '' : obs);
+  let m = t.match(/\bteto\s*(?:de\s+carga\s*)?(?:em\s+|de\s+|:\s*)?(\d+(?:[.,]\d+)?)\s*kg/i);
+  if (m) return parseFloat(m[1].replace(',', '.'));
+  // "Travado em 25kg" e congelamento informal escrito pelo trainer, com efeito
+  // pratico identico ao teto. Exige numero+kg logo depois, entao "Travar em 15
+  // reps" e "10 semanas travado" nao casam.
+  m = t.match(/trav(?:ado|ada|ar)\s+(?:em\s+)?(\d+(?:[.,]\d+)?)\s*kg/i);
+  if (m) return parseFloat(m[1].replace(',', '.'));
+  return null;
+}
+
+// Sinal INDEPENDENTE do numero: mesmo que o teto nao parseie, "progride so em
+// reps" ja e ordem suficiente pra nunca oferecer carga nova.
+function soProgrideEmReps(obs) {
+  return /progride\s+s[o\u00f3]\s+em\s+reps/i.test(String(obs == null ? '' : obs));
+}
+
+// v30.2.0 (2o defeito do mesmo bug): as reps REAIS por serie moram na OBS DO
+// REGISTRO. O Marcos loga a FAIXA do plano no campo reps ("15-20", igualzinha
+// a do plano) e escreve "15/15/15" na obs. O heuristico antigo fazia
+//   bateuReps = fezMin >= alvoTopo || (fechou && ult.reps === p.reps)
+// e o segundo ramo dava TRUE porque "15-20" === "15-20" - o app concluia "bateu
+// as 20 reps" com a prova do contrario ("15/15/15") na mesma linha. Isso valia
+// pra TODO exercicio, nao so pro face pull.
+// Conservador de proposito: na duvida devolve null e o app cai no comportamento
+// antigo. Guarda n>=1 mata a escala de dor ("Ombro esq 0/10"); n<=60 mata data.
+// Timestamp legado corrompido na obs sai fora antes de tudo.
+function repsDaObsDoRegistro(obs) {
+  const t = String(obs == null ? '' : obs);
+  if (!t) return null;
+  if (/\d{4}-\d{2}-\d{2}/.test(t)) return null;
+  const m = t.match(/(?:^|[^\d/])(\d{1,2}(?:\s*\/\s*\d{1,2}){1,7})(?![\d/])/);
+  if (!m) return null;
+  const nums = m[1].split('/').map(x => parseInt(x.trim(), 10));
+  if (nums.some(n => !isFinite(n) || n < 1 || n > 60)) return null;
+  return nums;
+}
+
 // Devolve null (sem historico) ou:
-// { ult, tipo: 'meta'|'sobe'|'mantem'|'so-historico', novaCarga: 'Xkg'|null, texto }
+// { ult, tipo: 'meta'|'sobe'|'mantem'|'so-historico'|'teto'|'teto-acima',
+//   novaCarga: 'Xkg'|null, texto }
 function sugestaoProgressao(nome, planoItem) {
   const ult = ultimoRegistroDe(nome);
   if (!ult) return null;
@@ -6716,19 +7146,56 @@ function sugestaoProgressao(nome, planoItem) {
   const fezMin = numMinDe(ult.reps);        // pior serie ("10/9/8" -> 8)
   const alvoTopo = numMaxDe(p.reps);        // topo da faixa do plano ("8-10" -> 10)
   const fechou = registroFechou(ult);
+  // v30.2.0: teto de carga e a ordem "progride so em reps", vindos da obs do
+  // PLANO (ver tetoDeCargaDaObs pro historico completo do bug).
+  const teto = tetoDeCargaDaObs(p.obs);
+  const soReps = soProgrideEmReps(p.obs);
   // "bateu as reps": pior serie >= topo da faixa, OU o aluno FECHOU (✓ SIM) e
   // registrou as reps identicas as do plano (na pratica ele loga a faixa
   // "15-20" sem editar — fechou + faixa cumprida = cumpriu o planejado, que e
   // exatamente a condicao de progressao do wger).
-  const bateuReps = (alvoTopo == null || fezMin == null)
+  let bateuReps = (alvoTopo == null || fezMin == null)
     ? null
     : (fezMin >= alvoTopo ||
        (fechou && String(ult.reps || '').trim() === String(p.reps || '').trim()));
+  // v30.2.0: VETO pelas reps reais escritas na obs do registro ("15/15/15").
+  // So derruba pra false, nunca levanta pra true - ver repsDaObsDoRegistro.
+  const repsReais = repsDaObsDoRegistro(ult.obs);
+  if (bateuReps !== false && repsReais && alvoTopo != null &&
+      Math.min.apply(null, repsReais) < alvoTopo) {
+    bateuReps = false;
+  }
+  // v30.2.0: ja esta NO teto ou ACIMA dele. Nunca oferece carga; explica o que
+  // fazer no lugar (subir reps ate o topo da faixa do plano).
+  if (teto != null && cargaNum >= teto) {
+    const alvoTxt = alvoTopo != null
+      ? ' — progride so em reps ate ' + (p.series ? String(p.series) + 'x' : '') + alvoTopo
+      : ' — progride so em reps';
+    if (cargaNum > teto) {
+      return { ult, tipo: 'teto-acima', novaCarga: null,
+        texto: '⚠ TETO DE CARGA ' + fmtCargaKg(teto) + ' — voce esta em ' +
+               fmtCargaKg(cargaNum) + '. Volte pro teto' + alvoTxt.replace(' — ', ' e ') };
+    }
+    return { ult, tipo: 'teto', novaCarga: null,
+      texto: '= NO TETO DE CARGA (' + fmtCargaKg(teto) + ')' + alvoTxt };
+  }
+  // v30.2.0: obs manda progredir so em reps, sem numero de teto legivel.
+  if (soReps) {
+    return { ult, tipo: 'teto', novaCarga: null,
+      texto: '= MANTER ' + fmtCargaKg(cargaNum) + ' — o plano diz progride so em reps' };
+  }
   if (fechou && rir != null && rir >= 2 && bateuReps !== false) {
     const inc = cargaNum >= 60 ? 5 : 2.5;
-    const nova = fmtCargaKg(cargaNum + inc);
-    return { ult, tipo: 'sobe', novaCarga: nova,
-      texto: '↑ SUGESTAO: ' + nova + ' (sobrou RIR ' + rir + ')' };
+    // v30.2.0: o incremento nunca ultrapassa o teto. Se o passo cheio passaria
+    // de 30, oferece exatamente 30 - o degrau final ate o teto e legitimo.
+    let novaNum = cargaNum + inc;
+    if (teto != null && novaNum > teto) novaNum = teto;
+    if (novaNum > cargaNum) {
+      const nova = fmtCargaKg(novaNum);
+      const ate = (teto != null && novaNum === teto) ? ' — ultimo degrau ate o teto' : '';
+      return { ult, tipo: 'sobe', novaCarga: nova,
+        texto: '↑ SUGESTAO: ' + nova + ' (sobrou RIR ' + rir + ')' + ate };
+    }
   }
   let motivo;
   if (!fechou) motivo = 'nao fechou a ultima';
@@ -6769,7 +7236,11 @@ function ultimoLinhaModalHtml(p) {
   let html = '<div class="mono text-[10px] mb-3 tracking-wider" style="color:#6E7683">ULTIMO ' +
     escapeHtml(fmtDate(dataSessao(sug.ult)) || '') + ': ' + resumoUltimoHtml(sug.ult);
   if (sug.texto) {
-    const cor = { sobe: '#10935E', meta: '#C77400' }[sug.tipo] || '#6E7683';
+    // v30.2.0: os tipos de teto entram aqui tambem — este modal chama a MESMA
+    // sugestaoProgressao e era o segundo caminho que oferecia o botao USAR com
+    // uma carga acima do teto.
+    const cor = { sobe: '#10935E', meta: '#C77400', teto: '#C77400',
+                  'teto-acima': '#EB4D45' }[sug.tipo] || '#6E7683';
     html += '<span style="color:' + cor + '"> · ' + escapeHtml(sug.texto) + '</span>';
   }
   if (sug.novaCarga) {
@@ -6799,6 +7270,73 @@ function aplicarSugestaoTreinar() {
   toast('Carga sugerida aplicada: ' + s.novaCarga, 'success');
 }
 
+// v30.2.0: grupos musculares PRIMARIOS do exercicio. musculosDoExercicio()
+// mistura primario com secundario (serve pro mapa de recuperacao, onde os dois
+// contam); aqui misturar estragaria o ranking — supino tem triceps como
+// secundario e viraria "compativel" com triceps corda.
+// Sem ficha cadastrada, cai no conjunto geral: pior, mas melhor que lista vazia.
+function gruposPrimariosDe(nome) {
+  const info = exInfoDe(nome);
+  if (info) {
+    const prim = String(info.musculos_primarios || '').split(';')
+      .map(x => x.trim().toLowerCase()).filter(x => MAPA_GRUPOS.indexOf(x) >= 0);
+    if (prim.length) return prim;
+  }
+  return musculosDoExercicio(nome);
+}
+
+// v30.2.0: candidatos a troca, tirados da tabela de fichas (55 exercicios) e
+// ranqueados por musculo primario. Conjunto primario IDENTICO vem antes de
+// sobreposicao parcial.
+// LIMITE 6 de proposito: a lista vive num modal de celular, embaixo dela ainda
+// tem o campo de texto livre. Passando de 6 ele rola sem ver que da pra
+// escrever, e o pedido original era justamente poder escrever.
+function sugestoesDeTroca(nome, jaListados, limite) {
+  const prim = gruposPrimariosDe(nome);
+  if (!prim.length) return [];
+  const alvo = {};
+  prim.forEach(x => { alvo[x] = true; });
+  const vistos = {};
+  (jaListados || []).forEach(n => { vistos[slugify(n)] = true; });
+  // secundario do ALVO entra como desempate. Sem isso, "Face pull" (ombro +
+  // costas) empata com "Elevacao lateral" (ombro puro) e a lateral pode vir
+  // antes do "Crucifixo invertido" (ombro + costas), que e o que de fato
+  // substitui um exercicio postural de cadeia posterior. A tabela so tem 9
+  // grupos grossos — o secundario e o unico sinal fino disponivel aqui.
+  const infoAlvo = exInfoDe(nome);
+  const secAlvo = {};
+  if (infoAlvo) {
+    String(infoAlvo.musculos_secundarios || '').split(';')
+      .map(x => x.trim().toLowerCase()).filter(Boolean)
+      .forEach(x => { secAlvo[x] = true; });
+  }
+  const fichas = (APP.data && Array.isArray(APP.data.exercicios)) ? APP.data.exercicios : [];
+  const cand = [];
+  fichas.forEach(g => {
+    const n = String(g.nome_atual || '').trim();
+    if (!n || vistos[slugify(n)]) return;
+    const p2 = gruposPrimariosDe(n);
+    if (!p2.length) return;
+    const comuns = p2.filter(x => alvo[x]);
+    if (!comuns.length) return;
+    const exato = (comuns.length === prim.length && p2.length === prim.length);
+    const sec2 = String(g.musculos_secundarios || '').split(';')
+      .map(x => x.trim().toLowerCase()).filter(Boolean);
+    const secComuns = sec2.filter(x => secAlvo[x]);
+    cand.push({
+      nome: n,
+      score: (exato ? 100 : 0) + comuns.length * 10 + secComuns.length * 3
+             - Math.abs(p2.length - prim.length),
+      motivo: (exato ? 'mesmo primario: ' : 'em comum: ') +
+              comuns.map(m => MAPA_LABEL[m] || m).join(', ') +
+              (secComuns.length ? ' + ' + secComuns.map(m => MAPA_LABEL[m] || m).join(', ') : '') +
+              (g.equipamento ? ' · ' + g.equipamento : ''),
+    });
+  });
+  cand.sort((a, b) => (b.score - a.score) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  return cand.slice(0, limite || 6);
+}
+
 function abrirTrocaExercicio() {
   const idx = TREINAR.idx;
   const p = TREINAR.plano[idx];
@@ -6817,7 +7355,38 @@ function abrirTrocaExercicio() {
       : 'btn w-full text-left py-4';
     return `<button type="button" class="${cls}" onclick="trocarExercicioIdx(${i})">${atual ? '✓ ' : ''}${escapeHtml(nome)}${tag}</button>`;
   }).join('');
+  // v30.2.0: sugeridos entram no MESMO array _trocaOpcoes, depois dos fixos —
+  // assim trocarExercicioIdx(i) continua sendo o unico caminho de troca por
+  // indice, sem segunda lista pra dessincronizar.
+  const sug = sugestoesDeTroca(efetivo, opcoes, 6);
+  const bloco = $('trocar-sugeridos-bloco');
+  const cont = $('trocar-sugeridos');
+  if (cont) {
+    cont.innerHTML = sug.map((c) => {
+      const i = TREINAR._trocaOpcoes.push(c.nome) - 1;
+      return `<button type="button" class="btn w-full text-left py-3" onclick="trocarExercicioIdx(${i})">` +
+        `<span class="block">${escapeHtml(c.nome)}</span>` +
+        `<span class="block mono text-[10px] text-zinc-500 mt-0.5">${escapeHtml(c.motivo)}</span></button>`;
+    }).join('');
+  }
+  if (bloco) bloco.classList.toggle('hidden', sug.length === 0);
+  // campo livre: mesmo datalist do exercicio extra (4 fontes, ja em memoria)
+  const dl = $('lista-exercicios-conhecidos');
+  if (dl) dl.innerHTML = nomesConhecidosParaExtra().map(n => `<option value="${escapeHtml(n)}">`).join('');
+  const livre = $('trocar-livre-input');
+  if (livre) livre.value = '';
   $('modal-trocar').classList.remove('hidden');
+}
+
+// v30.2.0: "se nao tem opcao compativel, eu escrevo". Empurra o nome digitado
+// no mesmo array de opcoes e reusa trocarExercicioIdx — um caminho so.
+function trocarPorTextoLivre() {
+  const el = $('trocar-livre-input');
+  const nome = el ? String(el.value || '').trim() : '';
+  if (!nome) { toast('Escreva o nome do exercicio', 'error'); return; }
+  if (!Array.isArray(TREINAR._trocaOpcoes)) TREINAR._trocaOpcoes = [];
+  const i = TREINAR._trocaOpcoes.push(nome) - 1;
+  trocarExercicioIdx(i);
 }
 
 function trocarExercicioIdx(i) {
@@ -6965,10 +7534,16 @@ function mostrarExercicioAtual() {
     elSug.textContent = sug.texto + (sug.novaCarga ? ' · toque pra aplicar' : '');
     // cores do design system (mesmas do mapa muscular) via style inline —
     // o CSS do app e Tailwind PRE-compilado, classe nova nao existe no bundle.
+    // v30.2.0: 'teto' (esta no teto, tudo certo) sai ambar igual a meta;
+    // 'teto-acima' sai no vermelho de FALTA (#EB4D45) porque e violacao de uma
+    // regra do plano, nao um aviso. Sem os dois casos aqui, os dois cairiam no
+    // cinza de 'mantem' e o alerta mais importante da tela ficaria discreto.
     const corSug = {
-      sobe:   { c: '#10935E', b: 'rgba(16,147,94,.45)',  bg: 'rgba(16,147,94,.06)' },
-      meta:   { c: '#C77400', b: 'rgba(199,116,0,.45)',  bg: 'rgba(199,116,0,.07)' },
-      mantem: { c: '#6E7683', b: 'rgba(110,118,131,.35)', bg: 'transparent' },
+      sobe:         { c: '#10935E', b: 'rgba(16,147,94,.45)',  bg: 'rgba(16,147,94,.06)' },
+      meta:         { c: '#C77400', b: 'rgba(199,116,0,.45)',  bg: 'rgba(199,116,0,.07)' },
+      teto:         { c: '#C77400', b: 'rgba(199,116,0,.45)',  bg: 'rgba(199,116,0,.07)' },
+      'teto-acima': { c: '#EB4D45', b: 'rgba(235,77,69,.55)',  bg: 'rgba(235,77,69,.10)' },
+      mantem:       { c: '#6E7683', b: 'rgba(110,118,131,.35)', bg: 'transparent' },
     }[sug.tipo] || { c: '#6E7683', b: 'rgba(110,118,131,.35)', bg: 'transparent' };
     elSug.style.color = corSug.c;
     elSug.style.borderColor = corSug.b;
@@ -6994,12 +7569,26 @@ function mostrarExercicioAtual() {
     b.style.opacity = salvo ? '0.35' : '1';
   });
   fecheiHoldReset(); // v26.1: zera a barra de "segurar" ao entrar no exercicio
-  // v26: botao TROCAR aparece so se ha equivalentes e o exercicio ainda nao foi salvo
-  const alts = equivalentesDe(p.exercicio);
+  // v30.2.0: TROCAR aparece em TODO exercicio, nao so nos que tem equivalente
+  // cadastrado. GRUPOS_EQUIV so tem 2 grupos escritos a mao, entao na pratica
+  // quase nenhum exercicio mostrava o botao — e trocar virava "adicionar extra
+  // + marcar faltei", dois passos e um registro de falta que nao aconteceu.
+  // O modal agora sempre tem o que oferecer: equivalentes, sugestao automatica
+  // por musculo e campo de texto livre.
   const btnTrocar = $('btn-treinar-trocar');
-  const podeTrocar = alts.length > 0 && !salvo;
+  const podeTrocar = !salvo;
   btnTrocar.classList.toggle('hidden', !podeTrocar);
   btnTrocar.disabled = !podeTrocar;
+  // v30.2.0: REMOVER so existe pra exercicio EXTRA. Depois de salvo ele
+  // CONTINUA visivel e clicavel, so apagado (opacity) - de proposito: quem
+  // explica por que nao da mais pra remover e o toast do
+  // excluirExercicioAtual, e aqui a explicacao importa (o registro ja pode
+  // estar no servidor). Botao que some sozinho deixa o aluno procurando.
+  const btnExcluir = $('btn-treinar-excluir');
+  if (btnExcluir) {
+    btnExcluir.classList.toggle('hidden', !p._extra);
+    btnExcluir.style.opacity = salvo ? '0.45' : '1';
+  }
   // indicador de substituicao ativa (mostra o exercicio original do plano)
   const indEl = $('treinar-substituido');
   if (TREINAR.substituto[TREINAR.idx]) {
@@ -7031,6 +7620,24 @@ function marcarExistentesComoSalvos(existentes) {
     TREINAR.statuses[idx] = 'saved';
   });
   atualizarStatusBar();
+}
+
+// v30.2.0: nota automatica de troca na obs do registro. O nome do substituto
+// ja ia pro campo exercicio desde a v26, mas o registro nao dizia o que ele
+// SUBSTITUIU — no historico o exercicio do plano simplesmente sumia daquele
+// dia, e o trainer nao tinha como saber se foi troca ou falta.
+// Prepend, nao overwrite: o que o Marcos escreveu continua inteiro, depois da
+// nota. Se ele mesmo ja escreveu a frase, nao duplica.
+function obsComNotaDeTroca(obs, idx) {
+  const sub = TREINAR.substituto && TREINAR.substituto[idx];
+  const p = TREINAR.plano[idx] || {};
+  const orig = String(p.exercicio || '').trim();
+  const novo = String(sub || '').trim();
+  if (!novo || !orig || slugify(novo) === slugify(orig)) return String(obs || '').trim();
+  const nota = orig + ' trocado por ' + novo;
+  const t = String(obs || '').trim();
+  if (t && t.toLowerCase().indexOf(nota.toLowerCase()) >= 0) return t;
+  return t ? nota + '. ' + t : nota;
 }
 
 async function salvarRegistroAtual(completou) {
@@ -7077,7 +7684,7 @@ async function salvarRegistroAtual(completou) {
     reps: $('treinar-input-reps').value || '',
     rir: $('treinar-input-rir').value || '',
     completou,
-    obs: $('treinar-input-obs').value || '',
+    obs: obsComNotaDeTroca($('treinar-input-obs').value || '', idx),  // v30.2.0
     data_treino: dataTreino,  // YYYY-MM-DD ou vazio
   };
 
@@ -7241,31 +7848,248 @@ function irParaExercicio(i) {
 //   cinza claro = skipped (aluno pulou de proposito)
 //   cinza escuro = pending (ainda nao chegou nesse exercicio)
 //   ring ciano = atual
+// v30.2.0: LISTA DO DIA — estado de UM exercicio da sessao ja traduzido pro que
+// interessa na tela: o que ACONTECEU (fez / faltou / pulou / a fazer) e se o
+// registro ja subiu pro servidor. Cuidado com a nomenclatura antiga: em
+// TREINAR.statuses, 'saved' e 'failed' falam do ENVIO, nao do resultado — quem
+// sabe se fechou ou faltou e TREINAR.salvos[i].completou.
+// Le esse campo com registroFechou porque marcarExistentesComoSalvos o preenche
+// com o valor CRU do banco ('sim'/'nao', as vezes 'não' com til): !!'nao' da
+// TRUE e pintaria um FALTEI como FEITO.
+function estadoTreinarIdx(i) {
+  const st = TREINAR.statuses[i] || 'pending';
+  const salvo = TREINAR.salvos[i];
+  if (salvo) {
+    const fez = registroFechou(salvo);
+    return { chave: fez ? 'fez' : 'faltou', glifo: fez ? '✓' : '✗',
+             rotulo: fez ? 'FEITO' : 'FALTEI', naoEnviado: st === 'failed' };
+  }
+  if (st === 'skipped') return { chave: 'pulou', glifo: '–', rotulo: 'PULADO', naoEnviado: false };
+  return { chave: 'afazer', glifo: '', rotulo: 'A FAZER', naoEnviado: false };
+}
+
+// v30.2.0: a fileira de quadradinhos de 16px virou a barra-botao que abre a
+// LISTA DO DIA. Os segmentos continuam aqui (leitura de relance da sessao
+// inteira), mas quem navega agora e a lista, com o NOME de cada exercicio.
+// ESTA FUNCAO CONTINUA SENDO O UNICO PONTO DE RENDER DE STATUS: por isso ela
+// mesma chama renderListaDia(). Assim todos os chamadores antigos
+// (refreshStatusesFromBuffer, mostrarExercicioAtual, marcarExistentesComoSalvos,
+// pularExercicio, proximoExercicio e mostrarSummary) redesenham a lista de
+// graca — inclusive exercicio EXTRA e troca de exercicio, que passam por
+// mostrarExercicioAtual.
 function atualizarStatusBar() {
   const bar = $('treinar-status-bar');
   if (!bar) return;
-  bar.innerHTML = TREINAR.plano.map((p, i) => {
-    const status = TREINAR.statuses[i] || 'pending';
-    const colorClass = {
-      pending: 'bg-zinc-800',
-      saved: 'bg-emerald-500',
-      failed: 'bg-red-500',
-      skipped: 'bg-zinc-600',
-    }[status] || 'bg-zinc-800';
-    const isCurrent = i === TREINAR.idx ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-zinc-950' : '';
-    return `<button onclick="irParaExercicio(${i})" class="w-4 h-4 ${colorClass} ${isCurrent}" title="Ex ${i+1}: ${status}"></button>`;
+  const segs = TREINAR.plano.map((p, i) => {
+    const e = estadoTreinarIdx(i);
+    let cls = 'tl-seg tl-seg-' + e.chave;
+    if (p && p._extra) cls += ' tl-seg-extra';
+    if (e.naoEnviado) cls += ' tl-seg-envio';
+    if (i === TREINAR.idx) cls += ' tl-seg-atual';
+    return `<span class="${cls}"></span>`;
   }).join('');
+  bar.innerHTML = `<span class="tl-strip-lbl">LISTA ▸</span><span class="tl-strip-segs">${segs}</span>`;
+  renderListaDia();
 }
+
+// v30.2.0: desenha a gaveta/coluna com TODOS os exercicios do dia. Le so a
+// maquina de estado que ja existe (plano/statuses/salvos/substituto), entao
+// exercicio EXTRA (empurrado em TREINAR.plano por confirmarExercicioExtra) e
+// troca de exercicio aparecem sozinhos, sem caso especial.
+function renderListaDia() {
+  const ol = $('treinar-lista-itens');
+  if (!ol) return;
+  let fez = 0, faltou = 0, pulou = 0, resta = 0;
+  ol.innerHTML = TREINAR.plano.map((p, i) => {
+    const e = estadoTreinarIdx(i);
+    if (e.chave === 'fez') fez++;
+    else if (e.chave === 'faltou') faltou++;
+    else if (e.chave === 'pulou') pulou++;
+    else if (e.chave === 'afazer') resta++;
+    const atual = (i === TREINAR.idx);
+    const salvo = TREINAR.salvos[i];
+    // 2a linha: se ja registrou, mostra o que FOI registrado (e o dado util pra
+    // decidir a ordem do que falta); senao, o alvo do plano. valorRegistroLimpo
+    // filtra o timestamp corrompido que existe em registros LEGADOS.
+    let detalhe;
+    if (salvo) {
+      const ps = [];
+      const c = valorRegistroLimpo(salvo.carga), r = valorRegistroLimpo(salvo.reps), rr = valorRegistroLimpo(salvo.rir);
+      if (c) ps.push(c);
+      if (r) ps.push('×' + r);
+      if (rr) ps.push('RIR ' + rr);
+      detalhe = ps.join(' · ') || '—';
+    } else {
+      detalhe = (p.series || '?') + '×' + (p.reps || '?') + (p.carga ? ' · ' + p.carga : '');
+    }
+    let selos = '';
+    if (TREINAR.substituto[i]) selos += '<span class="tl-selo tl-selo-troca">⇄ TROCA</span>';
+    if (p._extra) selos += '<span class="tl-selo tl-selo-extra">+ EXTRA</span>';
+    return `<li class="tl-item"><button type="button" class="tl-linha tl-e-${e.chave}${atual ? ' tl-e-atual' : ''}"` +
+      `${atual ? ' aria-current="true"' : ''} onclick="irParaExercicioDaLista(${i})">` +
+      `<span class="tl-num">${String(i + 1).padStart(2, '0')}</span>` +
+      `<span class="tl-meio"><span class="tl-nome">${escapeHtml(nomeEfetivo(i) || '—')}${selos}</span>` +
+      `<span class="tl-alvo">${escapeHtml(detalhe)}</span></span>` +
+      `<span class="tl-marca">${e.glifo ? '<b>' + e.glifo + '</b>' : ''}${e.rotulo}${e.naoEnviado ? ' ⚠' : ''}</span>` +
+      `</button></li>`;
+  }).join('');
+  const elDia = $('treinar-lista-dia');
+  if (elDia) {
+    // letra + cor andam SEMPRE juntas (dia A e dia B somem um no outro sob
+    // deuteranopia — regra de desenho da v30).
+    elDia.textContent = APP.alunoDay || '—';
+    elDia.style.color = dayColorHex(APP.alunoDay);
+  }
+  const elSub = $('treinar-lista-sub');
+  if (elSub) {
+    // a conta tem que FECHAR com o total: se um pulado nao aparecesse aqui, a
+    // linha diria "3 EXERCICIOS · 1 FEITO · 1 A FAZER" e sumiria um item.
+    const partes = [fez + ' FEITO' + (fez === 1 ? '' : 'S')];
+    if (faltou > 0) partes.push(faltou + ' FALTEI');
+    if (pulou > 0) partes.push(pulou + ' PULADO' + (pulou === 1 ? '' : 'S'));
+    partes.push(resta + ' A FAZER');
+    elSub.textContent = TREINAR.plano.length + ' EXERCICIOS · ' + partes.join(' · ');
+  }
+}
+
+// v30.2.0: abre a gaveta. O estado mora numa classe do proprio #view-treinar
+// (.tl-on) — assim UMA classe liga o veu e a gaveta juntos, e some sozinha
+// quando a tela do TREINAR e escondida.
+function abrirListaDia() {
+  const v = $('view-treinar');
+  if (!v) return;
+  renderListaDia();  // seguro mesmo se algo abrir a lista sem passar por atualizarStatusBar
+  v.classList.add('tl-on');
+  const bar = $('treinar-status-bar');
+  if (bar) bar.setAttribute('aria-expanded', 'true');
+  // centraliza o exercicio da vez NA LISTA. Nada de scrollIntoView: ele pode
+  // arrastar junto o scroller de tras (#view-treinar), que e quem rola a tela
+  // do treino — a lista abriria com o exercicio certo e a tela de baixo torta.
+  const ol = $('treinar-lista-itens');
+  const linha = ol ? ol.querySelector('.tl-e-atual') : null;
+  if (ol && linha && linha.parentNode) {
+    const li = linha.parentNode;
+    ol.scrollTop = Math.max(0, li.offsetTop - (ol.clientHeight / 2) + (li.offsetHeight / 2));
+  }
+}
+
+function fecharListaDia() {
+  const v = $('view-treinar');
+  if (v) v.classList.remove('tl-on');
+  const bar = $('treinar-status-bar');
+  if (bar) bar.setAttribute('aria-expanded', 'false');
+}
+
+// v30.2.0: toque numa linha vai pro exercicio E fecha a gaveta — no celular ela
+// cobre a tela, e deixar aberta esconderia justo o exercicio que ele escolheu.
+// No modo coluna (>=1240px) o CSS mantem a coluna fixa, entao fechar aqui nao
+// tira nada da tela.
+function irParaExercicioDaLista(i) {
+  fecharListaDia();
+  irParaExercicio(i);
+}
+
+// v30.2.0: ESC fecha a gaveta. Vale so pra quem tem teclado (o app tambem roda
+// no desktop); no celular quem fecha e o veu, o ✕ ou o toque numa linha.
+// Preso em TREINAR.active pra nao roubar o ESC de nenhuma outra tela.
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && TREINAR.active) fecharListaDia();
+});
 
 // v28.6: exercicio EXTRA fora do plano do dia, adicionado em tempo real na
 // sessao. Reaproveita 100% a maquina de estado do TREINAR (statuses/
 // localIds/salvos/substituto) - o exercicio extra funciona identico a
 // qualquer outro (fecha, salva, entra no resumo), so nao veio do plano.
+// v30.2.0: MEMORIA DE NOMES DO EXERCICIO EXTRA -------------------------------
+// Ate a v30.0.0 este datalist so conhecia APP.data.plano, entao nome digitado
+// a mao nunca voltava a aparecer - no treino seguinte era digitar de novo, do
+// zero, em pe, entre series. Agora sao 4 fontes, todas ja em memoria (zero
+// rede, funciona offline):
+//   1) APP.data.exercicios -> nome_atual + aliases (grafia curada, com acento)
+//   2) APP.data.plano      -> o que ja existia
+//   3) lista local deste celular (abaixo) -> tapa o unico buraco que as outras
+//      nao tapam: "adicionei agora e ainda nao sincronizou". O nome so vira
+//      historico DEPOIS do flush do buffer; offline isso pode demorar dias.
+//   4) APP.data.registros  -> tudo que ele ja treinou, extras inclusive, e a
+//      unica fonte que da RECENCIA.
+const EXTRAS_MAX = 40;   // teto da lista local (nome e string curta: ~2 KB no total)
+
+function extrasKey() {
+  // mesma convencao do bufferKey(): uma lista por aluno, 'anon' se nao logado
+  return 'forja-extras-' + (APP.alunoSession ? APP.alunoSession.id : 'anon');
+}
+
+function lerExtrasLocais() {
+  try {
+    const a = JSON.parse(localStorage.getItem(extrasKey()) || '[]');
+    return Array.isArray(a) ? a.filter(e => e && e.nome) : [];
+  } catch (e) { return []; }   // JSON corrompido / modo privado: lista vazia, nada quebra
+}
+
+// MRU: o nome vai pra FRENTE e a versao antiga do mesmo slug sai. Sem o dedupe
+// por slug, "Face pull" e "face pull " (espaco no fim) virariam duas linhas -
+// que e exatamente o caso que o slugify() existe pra matar. Toda escrita em
+// try/catch: lembrar nome e conforto, nunca requisito.
+function gravarExtraLocal(nome) {
+  const s = slugify(nome);
+  if (!s) return;
+  const lista = lerExtrasLocais().filter(e => slugify(e.nome) !== s);
+  lista.unshift({ nome: String(nome).trim(), ts: hojeIso() });
+  try { localStorage.setItem(extrasKey(), JSON.stringify(lista.slice(0, EXTRAS_MAX))); }
+  catch (e) { /* quota / modo privado: segue sem lembrar */ }
+}
+
+// Chamado quando um extra e REMOVIDO da sessao. Se ele apagou porque digitou
+// errado, manter o typo na lista seria o oposto do pedido. So mexe na lista
+// LOCAL: nome que tambem esta no plano, na tabela de fichas ou no historico
+// continua no datalist - essas fontes nao sao nossas pra apagar.
+function esquecerExtraLocal(nome) {
+  const s = slugify(nome);
+  if (!s) return;
+  const lista = lerExtrasLocais().filter(e => slugify(e.nome) !== s);
+  try { localStorage.setItem(extrasKey(), JSON.stringify(lista)); } catch (e) {}
+}
+
+// Junta as 4 fontes num datalist so. Dedupe por SLUG. Ordem: usado mais
+// recentemente primeiro, porque o datalist do Chrome respeita a ordem do DOM -
+// o que ele treinou semana passada tem que aparecer antes do que nunca fez. O
+// resto sai alfabetico com localeCompare('pt-BR'): no sort() cru, por code
+// point, "Abdutora" com acento cai DEPOIS de "Zerchers".
+function nomesConhecidosParaExtra() {
+  const arr = (x) => Array.isArray(x) ? x : [];
+  const d = APP.data || {};
+  const porSlug = new Map();
+  function add(nome, quando) {
+    const s = slugify(nome);
+    if (!s) return;
+    const atual = porSlug.get(s);
+    // quem entra PRIMEIRO define como o nome aparece escrito (por isso a
+    // tabela de fichas vem antes: e a grafia curada, com acento certo).
+    if (!atual) { porSlug.set(s, { nome: String(nome).trim(), quando: quando || '' }); return; }
+    if (quando && quando > atual.quando) atual.quando = quando;  // so a recencia melhora
+  }
+  arr(d.exercicios).forEach(g => {
+    add(g.nome_atual, '');
+    String(g.aliases || '').split(';').forEach(a => add(a, ''));
+  });
+  arr(d.plano).forEach(p => add(p.exercicio, ''));
+  lerExtrasLocais().forEach(e => add(e.nome, e.ts || ''));
+  // dataSessao pode devolver '' (timestamp legado corrompido - ver v29.10.0):
+  // '' aqui so significa "sem recencia conhecida", nunca quebra a ordenacao.
+  arr(d.registros).forEach(r => add(r.exercicio, dataSessao(r) || ''));
+  return Array.from(porSlug.values()).sort((a, b) => {
+    if (a.quando && b.quando) return b.quando.localeCompare(a.quando) || a.nome.localeCompare(b.nome, 'pt-BR');
+    if (a.quando) return -1;
+    if (b.quando) return 1;
+    return a.nome.localeCompare(b.nome, 'pt-BR');
+  }).map(v => v.nome).slice(0, 250);   // teto de DOM; hoje da ~100 opcoes
+}
+
 function abrirModalExtra() {
-  const nomes = new Set();
-  (APP.data.plano || []).forEach(p => { if (p.exercicio) nomes.add(p.exercicio); });
   const dl = $('lista-exercicios-conhecidos');
-  dl.innerHTML = Array.from(nomes).sort().map(n => `<option value="${escapeHtml(n)}">`).join('');
+  // escapeHtml continua obrigatorio: o nome vem do banco E do que ele digitou,
+  // e entra dentro de um atributo HTML.
+  if (dl) dl.innerHTML = nomesConhecidosParaExtra().map(n => `<option value="${escapeHtml(n)}">`).join('');
   $('extra-exercicio-input').value = '';
   $('modal-extra-exercicio').classList.remove('hidden');
   setTimeout(() => $('extra-exercicio-input').focus(), 50);
@@ -7278,15 +8102,82 @@ function fecharModalExtra() {
 function confirmarExercicioExtra() {
   const nome = $('extra-exercicio-input').value.trim();
   if (!nome) { toast('Digite ou escolha um exercicio', 'error'); return; }
-  TREINAR.plano.push({ dia: APP.alunoDay, ordem: TREINAR.plano.length + 1, exercicio: nome, series: '', reps: '', carga: '', rir: '', obs: '' });
+  // v30.2.0: _extra marca "adicionado nesta sessao" e e o que libera o botao
+  // REMOVER. NAO vaza pro banco: salvarRegistroAtual monta o payload campo a
+  // campo (action/aluno_id/pin/dia/exercicio/carga/reps/rir/completou/obs/
+  // data_treino) e nunca faz spread do item do plano - conferido no caminho
+  // inteiro do save (pushBuffer -> _flushBufferInner -> apiPost). Tambem nao
+  // suja APP.data.plano: os itens do plano sao referencias compartilhadas com
+  // ele, mas este objeto e literal novo, criado aqui.
+  TREINAR.plano.push({ dia: APP.alunoDay, ordem: TREINAR.plano.length + 1, exercicio: nome, series: '', reps: '', carga: '', rir: '', obs: '', _extra: true });
   TREINAR.statuses.push('pending');
   TREINAR.localIds.push(null);
   TREINAR.salvos.push(null);
   TREINAR.substituto.push(null);
+  gravarExtraLocal(nome);   // v30.2.0: lembra o nome AGORA, antes de qualquer rede
   TREINAR.idx = TREINAR.plano.length - 1;
   fecharModalExtra();
   mostrarExercicioAtual();
   toast('Exercicio extra adicionado — preencha e feche normalmente', 'info');
+}
+
+// v30.2.0: REMOVER EXERCICIO EXTRA DA SESSAO ---------------------------------
+// Pedido do aluno: "mudei de ideia ou digitei errado". Vale SO pra exercicio
+// EXTRA (p._extra). Apagar item do PLANO seria outra coisa: o plano e do
+// trainer, e "nao vou fazer este" ja tem dois caminhos - o ✗ FALTEI, que
+// REGISTRA a falta (dado que o trainer quer ver), e a navegacao livre, que so
+// nao passa por ele. Um terceiro botao que faz o item sumir viraria um jeito
+// silencioso de nao cumprir o plano.
+//
+// Reindexacao: todo array PARALELO indexado por idx tem que andar junto, senao
+// o exercicio i passa a mostrar o status/salvo do i+1. Os paralelos que
+// existem de fato no TREINAR sao 5: plano, statuses, localIds, salvos,
+// substituto. `resultados` NAO e paralelo (e um log append-only que so
+// alimenta o resumo) e nunca tem entrada pra um indice removivel aqui, porque
+// exercicio ja salvo e barrado antes.
+function removerExercicioIdx(i) {
+  TREINAR.plano.splice(i, 1);
+  TREINAR.statuses.splice(i, 1);
+  TREINAR.localIds.splice(i, 1);
+  TREINAR.salvos.splice(i, 1);
+  TREINAR.substituto.splice(i, 1);
+  // idx: saiu um ANTES do atual -> anda um pra tras (senao a tela pula de
+  // exercicio sozinha); saiu o ATUAL -> o indice fica igual e passa a apontar
+  // pro que era o proximo; saiu um DEPOIS -> nao mexe. Em qualquer um dos tres
+  // ainda pode ter caido fora da lista (era o ultimo), entao clampa no fim.
+  if (TREINAR.idx > i) TREINAR.idx--;
+  if (TREINAR.idx > TREINAR.plano.length - 1) TREINAR.idx = TREINAR.plano.length - 1;
+  if (TREINAR.idx < 0) TREINAR.idx = 0;
+}
+
+function excluirExercicioAtual() {
+  const idx = TREINAR.idx;
+  const p = TREINAR.plano[idx];
+  if (!p) return;
+  if (!p._extra) { toast('So da pra remover exercicio EXTRA. Do plano, use ✗ FALTEI', 'info'); return; }
+  // ARMADILHA: o registro ja foi pro buffer local no ato do FECHEI/FALTEI e
+  // pode ja estar no servidor - o envio e em segundo plano, sem confirmacao na
+  // tela. Tirar da lista NAO apagaria o registro: sobraria um fantasma no
+  // historico e ele acharia que tinha apagado. Nao da pra desfazer daqui com
+  // seguranca (o _localId pode estar sendo enviado neste exato momento pelo
+  // flushBuffer, e a resposta que confirma nao voltou). Entao bloqueia e manda
+  // pro lugar que apaga de verdade.
+  if (TREINAR.salvos[idx]) {
+    toast('Ja registrado nesta sessao. Remover daqui nao apagaria o registro - apague em EVOLUCAO & HISTORICO', 'error');
+    return;
+  }
+  // Sessao vazia nao pode acontecer: iniciarTreinar recusa dia sem exercicio,
+  // entao sempre sobra pelo menos 1 item do PLANO, que nao e removivel. O
+  // guarda fica assim mesmo porque a tela sem exercicio nenhum e um beco (o
+  // proximoExercicio cairia direto no resumo e o progresso viraria 0/0).
+  if (TREINAR.plano.length <= 1) { toast('E o unico exercicio da sessao - nao da pra remover', 'error'); return; }
+  const nome = nomeEfetivo(idx) || p.exercicio || 'este exercicio';
+  if (!confirm('Remover "' + nome + '" da sessao?\n\nSo sai da lista de hoje. Nada foi registrado ainda, entao nada e apagado do historico.')) return;
+  const nomeOriginal = p.exercicio;
+  removerExercicioIdx(idx);
+  esquecerExtraLocal(nomeOriginal);  // v30.2.0: typo removido nao volta na lista
+  mostrarExercicioAtual();           // redesenha tudo - ele chama atualizarStatusBar no fim
+  toast('Removido da sessao: ' + nome, 'success');
 }
 
 function proximoExercicio() {

@@ -1,4 +1,154 @@
-<!-- FORJA v30.2.0 - PACOTE TREINAR AGORA + BUGFIX DO TETO DE CARGA
+<!-- FORJA v30.6.0 - JOGO DE ICONES (peca 4 de 4): 36 simbolos no lugar dos emoji
+     Os emoji FUNCIONAIS (balanca, bicicleta, trofeu, chama, musculo, raio)
+     viraram simbolos SVG de traco, num sprite de 36, pintados por
+     currentColor e dimensionados por --icn-size. Emoji renderiza diferente em
+     cada aparelho, ignora a cor do tema e nao escala com a fonte; num app que
+     e todo aco e brasa, um emoji colorido era o unico elemento que nao
+     pertencia.
+
+     NAO TROCADOS, de proposito: os simbolos TIPOGRAFICOS de navegacao e estado
+     (▸ ◂ ✓ ✗ ⚠). Sao texto, alinham na fonte mono junto com o resto da linha,
+     e virar SVG ali pioraria — o glifo perde o baseline.
+
+     O RISCO QUE ESTE PATCH CARREGAVA (registrado no handoff como "NAO
+     REVISADO"): se icnSvg() nao resolvesse, o feed motivacional travaria a
+     TELA DE LOGIN — partesDoCardMotivacional roda no caminho do render do
+     feed, que pinta antes do aluno entrar. Conferido antes de aplicar:
+     icnSvg e `function icnSvg(...)`, declaracao de funcao, dentro do <script>
+     unico do arquivo. Declaracao de funcao e hoisted pro topo do escopo,
+     entao ela existe antes de qualquer chamada, nao importa onde o bloco foi
+     colado. O modo de falha restante e o sprite NAO estar no DOM — e ai
+     degrada (o <use> nao pinta nada, o botao fica so com texto), nao quebra.
+
+     As 18 substituicoes de uma linha foram conferidas uma a uma contra ESTE
+     arquivo antes de rodar (icones_dry.py): as 18 casam exatamente 1 vez. Isso
+     importava porque elas foram escritas contra a v30.0.0 e de la pra ca a
+     v30.2, v30.3, v30.4 e v30.5 mexeram em muita coisa.
+
+     FORJA v30.5.0 - CALENDARIO MAPA DE CALOR (peca 3, bloco 1 de 4)
+     O calendario da EVOLUCAO era um grid de quadradinhos verdes/azuis: dava
+     pra ver SE treinou, nao O QUE treinou. Agora cada dia carrega a LETRA do
+     treino (A/B/C/D), que e a informacao que faltava — olhando o mes ele ve a
+     rotacao inteira e onde ela quebrou, sem abrir sessao nenhuma.
+
+     Estados, casados um a um com o que o app ja sabia:
+       treinou forca ....... frq-c--str + letra do dia
+       so cardio ........... frq-c--car + glifo de batimento (nao conta falta)
+       passado sem treino .. frq-c--miss + X   (a regra "meta <=5 faltas/mes" fica)
+       hoje ................ frq-c--today (anel de brasa, soma com os de cima)
+       futuro .............. frq-c--fut
+       fora do mes ......... frq-c--pad
+     O tooltip por toque/hover/teclado veio da peca e mostra dia da semana,
+     tipo de treino e quantos exercicios. Cada celula e <button> de verdade:
+     antes eram <div>, sem foco de teclado e sem alvo de toque.
+
+     A navegacao de mes tambem mudou: os ◂ ▸ eram texto com px-2 (alvo de ~24px,
+     metade do minimo). Viraram botao de 44px.
+
+     O QUE NAO ENTROU DESTA PECA, e por que:
+       "Carga por grupo" — precisaria de volume por musculo, e volume so existe
+       quando ele anota as reps por serie na OBS ("15/15/15"). Em ~1/6 das
+       sessoes nao ha. Barra de volume pela metade das sessoes mente sobre o
+       resto; fica pra quando houver fonte melhor.
+       "Ritmo da forja" (aneis) — precisa de meta de frequencia semanal, que o
+       app nao guarda em lugar nenhum. Inventar 4x/semana porque a divisao e
+       ABCD seria numero de enfeite.
+       "O que ficou de pe" (placar) — o renderEvoStats ja e um placar com 7
+       cards, count-up e os cartoes de PESO e CARDIO. Trocar por outro placar
+       seria mexer em coisa que funciona pra ficar parecido com a demo.
+     O CSS da peca entrou INTEIRO (12 KB, prefixo .frq-) — os blocos acima ja
+     ficam vestidos se um dia entrarem.
+
+     FORJA v30.4.0 - GRAFICO DE PROGRESSAO EM SVG (peca 2 de 4) + FIM DO CHART.JS
+     O grafico da EVOLUCAO era Chart.js carregado sob demanda de um CDN. Agora
+     e SVG gerado pelo proprio app. O ganho nao e so visual: some a dependencia
+     externa e, com ela, o modo de falha "Grafico indisponivel offline.
+     Conecte-se uma vez para baixa-lo" — que aparecia exatamente pra quem
+     instalou o PWA e abriu no vestiario sem sinal. Saiu do <head>, do sw.js e
+     do ASSETS: CHARTJS_URL, ensureChartJs, _chartJsPromise e APP.evoCharts
+     nao existem mais.
+
+     A PECA TINHA GEOMETRIA CRAVADA no markup pra exatamente 21 pontos. Virou
+     gerador: mesma linguagem visual (area em brasa, losango de PR, anel de
+     deload, halo no ultimo ponto, painel de volume), numero de sessoes livre.
+     Escala com passo redondo (1/2/2,5/5/10) em vez de min-max cru.
+
+     TUDO QUE drawEvoChart FAZIA E O QUE ACONTECEU COM CADA COISA:
+       dropdown de exercicio ......... mantido (markup separado, nao mudou)
+       agrupar por alias ............. mantido (slugsEquivalentes)
+       filtro de periodo ............. mantido (filtrarPeriodo, a montante)
+       so pontos com carga numerica .. mantido (parseCargaNum)
+       linha de ALVO (meta do plano) . mantida, agora tracejada com rotulo
+       estado vazio .................. mantido
+       COMPARAR ALUNOS (trainer) ..... REESCRITO em modo proprio, ver abaixo
+       reuso do chart pra performance  n/a (montar string de SVG e barato)
+       gate sync-requeue do lazy load  DELETADO junto com o lazy load
+
+     COMPARAR ALUNOS virou modo separado de proposito. O desenho da peca e de
+     UMA serie: area preenchida, marcador de PR, barra de volume e o rotulo
+     grande do ultimo valor sao afirmacoes sobre um unico historico. Com 4
+     alunos sobrepostos a area vira sujeira e "o PR" nao quer dizer nada. O
+     modo comparar e so linhas, paleta categorica validada, e o tracejado muda
+     por serie — sob deuteranopia duas cores da paleta podem se aproximar,
+     entao a identidade nao fica so na cor.
+
+     VOLUME = carga x soma das reps DAS SERIES ANOTADAS, a lista "15/15/15" que
+     ele escreve na OBS (o mesmo parser do bugfix da v30.2.0). Sessao sem essa
+     lista NAO ganha barra: o trilho hachurado aparece no lugar. Multiplicar
+     por 3 "porque geralmente sao 3 series" encheria o painel de numero
+     inventado, e volume falso e pior que volume ausente.
+
+     REGRA DE OURO DO GERADOR: um NaN dentro de um atributo "d" apaga o desenho
+     INTEIRO, sem erro no console. Toda coordenada passa por chrNum() antes de
+     virar string. O harness de teste cobre serie plana (divisao por zero), um
+     ponto so, zero pontos, carga com virgula, 200 sessoes e serie vazia no
+     meio do comparar.
+
+     FORJA v30.3.0 - MAPA MUSCULAR ANATOMICO (peca 1 de 4 do roadmap visual)
+     O mapa de recuperacao era uma silhueta de elipses e retangulos com 9
+     grupos grossos e 3 estados (pronto/recuperando/atrasado). Virou o desenho
+     anatomico da v30: dois corpos (frente e costas), 16 grupos, cada um um
+     <path> proprio, pintados numa rampa sequencial de 4 bandas.
+
+     O PROBLEMA QUE PRECISOU SER RESOLVIDO ANTES: a tabela exercicios so sabe
+     9 grupos grossos (peito ombro triceps costas biceps core quadriceps
+     posterior panturrilha) e o desenho tem 16. Expandir 9->16 mecanicamente
+     MENTE, e mente feio neste plano: "Face pull" esta cadastrado como
+     primario "ombro"; se "ombro" acendesse deltoide anterior E posterior, o
+     mapa afirmaria que o face pull treinou o deltoide ANTERIOR - enquanto a
+     obs do plano diz, em maiusculas, "NAO fazer elevacao frontal - deltoide
+     anterior ja encurtado, piora a cifose". O app diria o oposto do objetivo
+     postural dele.
+     Solucao: musculosFinosDoExercicio(), uma tabela de REGRAS ORDENADAS
+     (nao por slug: o banco tem ~128 nomes distintos pra ~55 exercicios, e ele
+     digita nome novo toda semana no + EXERCICIO EXTRA; tabela por slug
+     nasceria desatualizada). A ordem e o que faz funcionar: face pull antes
+     de pull, invertido antes de crucifixo, remador antes de remada, pelvica
+     antes de elevacao, extensora (isolamento) antes de agachamento.
+     Cobertura medida contra os 128 nomes reais do banco: 125 casam, e os 3
+     que sobram sao cardio (esteira, remo ergometro, beach tenis) - nao devem
+     casar mesmo. Nome sem regra cai na HACHURA "sem registro", que e honesta;
+     nunca em 0%, que afirmaria "esta pronto".
+
+     RECUPERACAO EM PERCENTUAL: antes eram 3 estados discretos por dias desde
+     o ultimo treino. Agora v = 100 * (4 - dias)/4 * peso, com peso 1 pro
+     primario e 0,6 pro secundario, e o grupo fica com o MAIOR v de todos os
+     exercicios que o tocaram. 4 dias e a janela; alem dela o musculo esta
+     pronto (v=0). Grupo sem NENHUM registro fica com v=null (hachura), que e
+     diferente de v=0 (pronto).
+
+     "Deltoide ant./medial" tem esse rotulo DE PROPOSITO: o desenho nao tem
+     path pro deltoide medio, e elevacao lateral (deltoide medio, o unico
+     ombro que o plano manda treinar) so pode acender a cabeca frontal.
+     Mentir no rotulo seria pior que juntar os dois num nome honesto.
+
+     O markup do mapa e ESTATICO no body, nao montado por innerHTML: o SVG tem
+     ~17 KB de path e defs que nunca mudam. So a cor de cada path, a lista, o
+     chip e o painel sao reescritos a cada render. Isso tambem mata o problema
+     de listener acumulando a cada re-render do dashboard - os eventos sao
+     delegados no container e ligados UMA vez (guarda _mapaLigado).
+
+     FORJA v30.2.0 - PACOTE TREINAR AGORA + BUGFIX DO TETO DE CARGA
      Cinco pedidos do aluno, todos na mesma tela, mais um bug de seguranca.
 
      0) BUGFIX - A SUGESTAO DE CARGA IGNORAVA O TETO DO PLANO.
@@ -2365,6 +2515,702 @@
     #view-treinar label.mono { letter-spacing: .04em; }
   }
 
+  /* ==================================================================
+     v30.3.0: MAPA MUSCULAR ANATOMICO (peca `mapa`, prefixo .map-)
+     Colado da peca aprovada em _pecas_v30/mapa.css, sem edicao de desenho.
+     Duas coisas conferidas antes de colar: (1) a peca NAO tem bloco :root —
+     os tokens dela sao propriedades locais do .map-card, entao nao
+     sobrescrevem os do app; (2) nao ha seletor de elemento nu, entao nada
+     vaza pro resto da tela.
+     O max-width:390px do .map-card FICA: o painel do aluno e max-w-2xl
+     (672px) e o desenho de dois corpos nao ganha nada esticado.
+     ================================================================== */
+/* ==========================================================
+   MAPA MUSCULAR ANATOMICO - tema BRASA ESCURO - prefixo map-
+   ========================================================== */
+
+.map-card{
+  /* tokens do tema (locais, pra peca ser autocontida) */
+  --map-bg:#0B0E13;
+  --map-s1:#12171F;
+  --map-s2:#171E28;
+  --map-linha:#242C38;
+  --map-linha2:#323C4B;
+  --map-txt:#E9EDF3;
+  --map-dim:#98A2B1;
+  --map-fraco:#7C8797;
+  --map-b1:#973101;   /* so sombra/relevo: 2.4:1 sobre #12171F, nao carrega dado */
+  --map-b2:#C54302;   /* 3.6:1 */
+  --map-b3:#E85616;   /* 4.9:1 */
+  --map-b4:#FF7645;   /* 6.8:1 */
+  --map-halo:#FF8A4C;
+  --map-vazio:#2A3340;
+
+  position:relative;
+  box-sizing:border-box;
+  width:100%;
+  max-width:390px;
+  margin:0 auto;
+  padding:14px 14px 16px;
+  color:var(--map-txt);
+  font-family:'DM Sans',system-ui,-apple-system,sans-serif;
+  border:1px solid var(--map-linha);
+  border-radius:16px;
+  /* textura de aco escovado + brasa no topo, tudo em gradiente CSS */
+  background:
+    repeating-linear-gradient(115deg, rgba(233,237,243,.017) 0 2px, rgba(11,14,19,0) 2px 5px),
+    radial-gradient(120% 70% at 50% -10%, rgba(255,118,69,.085), rgba(11,14,19,0) 62%),
+    linear-gradient(180deg, var(--map-s2) 0%, var(--map-s1) 46%);
+  -webkit-tap-highlight-color:transparent;
+}
+.map-card *,.map-card *::before,.map-card *::after{box-sizing:border-box}
+
+/* ---------- cabecalho ---------- */
+.map-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.map-h{
+  margin:0;font-family:'Bebas Neue',Impact,sans-serif;font-size:27px;line-height:.92;
+  letter-spacing:.045em;color:var(--map-txt);
+}
+.map-sub{
+  margin:5px 0 0;font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+  font-size:10px;line-height:1.3;letter-spacing:.1em;text-transform:uppercase;color:var(--map-dim);
+}
+.map-chip{
+  display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+  padding:6px 10px;border-radius:999px;border:1px solid var(--map-linha2);background:var(--map-s2);
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.04em;
+  color:var(--map-dim);white-space:nowrap;
+}
+.map-chip-ic{flex:0 0 auto;width:11px;height:13px;display:block}
+
+/* ---------- palco do desenho ---------- */
+.map-palco{
+  position:relative;margin:2px -2px 12px;border-radius:12px;
+  background:radial-gradient(76% 60% at 50% 36%, rgba(255,118,69,.055), rgba(11,14,19,0) 72%);
+}
+.map-svg{display:block;width:100%;height:auto}
+.map-corpos{filter:drop-shadow(0 3px 9px rgba(11,14,19,.7))}
+.map-det{fill:none;stroke:rgba(11,14,19,.62);stroke-width:.9;stroke-linecap:round;pointer-events:none}
+.map-luz{fill:none;stroke:rgba(233,237,243,.10);stroke-width:1.1;stroke-linecap:round;pointer-events:none}
+.map-grao{pointer-events:none}
+.map-rot{
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.2em;
+  fill:var(--map-dim);text-anchor:middle;
+}
+
+/* ---------- musculos ---------- */
+.map-m{
+  fill:var(--map-c,#2A3340);
+  stroke:var(--map-bg);stroke-width:1;stroke-linejoin:round;
+  cursor:pointer;transition:opacity .18s ease, stroke .18s ease, stroke-width .18s ease;
+}
+/* sem registro: hachura + contorno tracejado claro (forma, nao cor) */
+.map-m[data-sem="1"]{stroke:var(--map-fraco);stroke-width:1;stroke-dasharray:3 2.6}
+.map-svg.map-foco .map-m{opacity:.4}
+.map-svg.map-foco .map-m.map-on{opacity:1;stroke:var(--map-halo);stroke-width:1.8;stroke-dasharray:none}
+/* pulso de brasa: so stroke-opacity (pinta, nao recalcula geometria) */
+.map-m--quente{stroke:var(--map-halo);stroke-width:1.3;stroke-opacity:.8;animation:map-pulso 3.2s ease-in-out infinite}
+@keyframes map-pulso{0%,100%{stroke-opacity:.28}50%{stroke-opacity:.95}}
+
+/* ---------- medidor de 3 segmentos (redundancia de forma) ---------- */
+.map-gauge{
+  display:flex;flex-direction:column-reverse;gap:2px;flex:0 0 auto;
+  width:11px;height:26px;
+}
+.map-gauge i{
+  display:block;flex:1 1 0;background:var(--map-vazio);
+  border:1px solid var(--map-linha2);border-radius:2px;
+}
+.map-gauge i:first-child{border-radius:2px 2px 3px 3px}   /* base */
+.map-gauge i:last-child{border-radius:3px 3px 2px 2px}    /* topo */
+.map-gauge[data-n="1"] i:nth-child(1),
+.map-gauge[data-n="2"] i:nth-child(-n+2),
+.map-gauge[data-n="3"] i{background:var(--map-c,#2A3340);border-color:var(--map-c,#2A3340)}
+.map-gauge[data-n="x"] i{background:transparent;border-style:dashed;border-color:var(--map-fraco)}
+
+/* ---------- tooltip ---------- */
+.map-tip{
+  position:absolute;left:0;top:0;z-index:6;min-width:158px;max-width:200px;
+  padding:8px 10px 9px;border:1px solid var(--map-linha2);border-radius:11px;
+  background:var(--map-s2);box-shadow:0 10px 26px rgba(11,14,19,.75);
+  opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,-100%);
+  transition:opacity .14s ease;
+}
+.map-tip.map-on{opacity:1;visibility:visible}
+.map-tip-cab{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.map-tip-nome{font-size:12.5px;line-height:1.15;color:var(--map-txt);font-weight:600}
+.map-tip-tag{
+  margin-left:auto;padding:2px 6px;border:1px solid var(--map-linha2);border-radius:999px;
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--map-dim);white-space:nowrap;
+}
+.map-tip-l{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:3px}
+.map-tip-l span{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.07em;color:var(--map-dim)}
+.map-tip-l b{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--map-txt);font-variant-numeric:tabular-nums;font-weight:600}
+
+/* ---------- legenda da escala ---------- */
+.map-legenda{margin:0 0 12px}
+.map-leg-cab{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.map-leg-lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.1em;color:var(--map-dim)}
+.map-rampa{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;align-items:end}
+.map-rampa-cel{display:flex;flex-direction:column;align-items:center;gap:4px}
+.map-rampa-cel b{
+  display:block;width:100%;height:9px;border-radius:2px;background:var(--map-cor);
+}
+.map-rampa-cel[data-n="0"] b{background:var(--map-vazio);box-shadow:inset 0 0 0 1px var(--map-linha2)}
+.map-rampa-cel .map-gauge{height:18px;width:10px}
+.map-rampa-num{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:5px}
+.map-rampa-num span{
+  text-align:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;
+  letter-spacing:.01em;color:var(--map-dim);
+}
+.map-leg-sem{display:flex;align-items:center;gap:8px;margin:9px 0 0;font-size:11px;color:var(--map-dim)}
+.map-sem-sw{flex:0 0 auto;width:15px;height:15px;display:block}
+
+/* ---------- lista compacta (alvo de toque garantido) ---------- */
+.map-cap{
+  margin:0 0 6px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--map-dim);
+}
+.map-lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.map-item{
+  display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 8px;
+  border:1px solid var(--map-linha);border-radius:11px;background:var(--map-s2);
+  color:inherit;font:inherit;text-align:left;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+  transition:border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.map-item:focus-visible{outline:2px solid var(--map-halo);outline-offset:2px}
+.map-item.map-on{background:var(--map-linha);border-color:var(--map-linha2);box-shadow:inset 3px 0 0 var(--map-halo)}
+.map-i-txt{flex:1 1 auto;min-width:0}
+.map-nome{display:block;font-size:11.5px;line-height:1.15;color:var(--map-txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-quando{
+  display:block;margin-top:2px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;
+  letter-spacing:.02em;color:var(--map-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.map-val{
+  flex:0 0 auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600;
+  color:var(--map-txt);font-variant-numeric:tabular-nums;
+}
+
+/* ---------- so pra leitor de tela ---------- */
+.map-vo{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- movimento reduzido ---------- */
+@media (prefers-reduced-motion: reduce){
+  .map-m--quente{animation:none;stroke-opacity:.8}
+  .map-m,.map-item,.map-tip{transition:none}
+}
+
+  /* ==================================================================
+     v30.4.0: GRAFICO DE PROGRESSAO (peca `progressao`, prefixo .chr-)
+     Colado de _pecas_v30/progressao.css. Sem :root e sem seletor de
+     elemento nu — os tokens sao propriedades locais do .chr-pack.
+     ================================================================== */
+/* ===== FORJA / BRASA ESCURO - pack de graficos de progressao (prefixo chr-) ===== */
+.chr-pack{
+  /* tokens do tema, escopados no bloco pra nao vazar */
+  --chr-bg:#0B0E13; --chr-s1:#12171F; --chr-s2:#171E28;
+  --chr-line:#242C38; --chr-lineHot:#323C4B;
+  --chr-text:#E9EDF3; --chr-dim:#98A2B1; --chr-faint:#7C8797;
+  --chr-b1:#973101; --chr-b2:#C54302; --chr-b3:#E85616; --chr-b4:#FF7645; --chr-glow:#FF8A4C;
+  --chr-ok:#09A66B; --chr-cardio:#0598CE; --chr-miss:#EB4D45; --chr-void:#2A3340;
+  --chr-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --chr-disp:'Bebas Neue','Arial Narrow',system-ui,sans-serif;
+  --chr-body:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  display:flex; flex-direction:column; gap:12px;
+  width:100%; max-width:420px; margin:0 auto;
+  font-family:var(--chr-body); color:var(--chr-text);
+  -webkit-tap-highlight-color:transparent;
+}
+.chr-pack, .chr-pack *{ box-sizing:border-box; }
+
+/* ---------- card ---------- */
+.chr-card{
+  position:relative; background:var(--chr-s1);
+  border:1px solid var(--chr-line); border-radius:16px;
+  padding:14px 16px 11px;
+}
+/* textura: grao (feTurbulence) + estria de aco escovado, tudo em SVG data-URI, zero arquivo */
+.chr-card::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:.055;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cdefs%3E%3Cfilter id='chr-gr'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Cpattern id='chr-rid' width='9' height='9' patternUnits='userSpaceOnUse' patternTransform='rotate(24)'%3E%3Cline x1='0' y1='0' x2='0' y2='9' stroke='%23E9EDF3' stroke-width='0.8' opacity='0.45'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='160' height='160' filter='url(%23chr-gr)' opacity='0.6'/%3E%3Crect width='160' height='160' fill='url(%23chr-rid)'/%3E%3C/svg%3E");
+}
+/* filete de brasa no topo do card */
+.chr-card::after{
+  content:''; position:absolute; left:16px; right:16px; top:0; height:1px; pointer-events:none;
+  background:linear-gradient(90deg,transparent,#973101 20%,#E85616 50%,#973101 80%,transparent);
+  opacity:.6;
+}
+
+/* ---------- cabecalho ---------- */
+.chr-head{ position:relative; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.chr-idt{ display:flex; align-items:flex-start; gap:9px; min-width:0; }
+.chr-ico{
+  flex:0 0 auto; width:28px; height:28px; margin-top:1px;
+  border-radius:11px; background:var(--chr-s2); border:1px solid var(--chr-line);
+  display:grid; place-items:center;
+}
+.chr-ico svg{ width:19px; height:19px; display:block; }
+.chr-icoFill rect, .chr-icoFill path{ fill:var(--chr-b3); }
+.chr-icoLine path, .chr-icoLine rect, .chr-icoLine line{
+  fill:none; stroke:var(--chr-b3); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round;
+}
+.chr-title{ margin:0; font-family:var(--chr-disp); font-size:25px; line-height:1; letter-spacing:.02em; color:var(--chr-text); }
+.chr-sub{ margin:5px 0 0; font-family:var(--chr-mono); font-size:10.5px; line-height:1.35; letter-spacing:.01em; color:var(--chr-dim); }
+.chr-kpi{ flex:0 0 auto; text-align:right; }
+.chr-kpiTop{ display:flex; align-items:center; justify-content:flex-end; gap:4px; }
+.chr-kpiVal{ font-family:var(--chr-mono); font-size:16px; font-weight:600; color:var(--chr-text); letter-spacing:-.01em; }
+.chr-kpiUn{ font-family:var(--chr-mono); font-size:10px; color:var(--chr-dim); }
+.chr-kpiLab{ margin-top:3px; font-family:var(--chr-mono); font-size:10px; letter-spacing:.08em; color:var(--chr-dim); }
+.chr-arrow{ width:11px; height:11px; display:block; flex:0 0 auto; }
+.chr-arrowUp{ fill:var(--chr-b4); }
+.chr-arrowDown{ fill:currentColor; }
+.chr-heroNum{ font-family:var(--chr-disp); font-size:40px; line-height:.9; letter-spacing:.01em; color:var(--chr-text); }
+.chr-heroUn{ font-family:var(--chr-mono); font-size:12px; font-weight:500; color:var(--chr-dim); margin-left:4px; letter-spacing:.02em; }
+.chr-delta{ display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:5px;
+  color:var(--chr-ok); font-family:var(--chr-mono); font-size:12px; font-weight:600; }
+
+/* ---------- area do grafico ---------- */
+.chr-plotWrap{
+  position:relative; margin-top:9px;
+  touch-action:pan-y;                 /* scroll vertical continua funcionando */
+  -webkit-user-select:none; user-select:none;
+  outline:none; border-radius:11px;
+}
+.chr-plotWrap:focus-visible{ box-shadow:0 0 0 2px var(--chr-b4); }
+.chr-svg{ display:block; width:100%; height:auto; }
+.chr-hit{ fill:transparent; }
+
+/* marcas do grafico de carga */
+.chr-grid line{ stroke:var(--chr-line); stroke-width:1; }
+.chr-base{ stroke:var(--chr-lineHot); stroke-width:1; }
+.chr-div{ stroke:var(--chr-lineHot); stroke-width:1; }
+.chr-railL{ stroke:var(--chr-line); stroke-width:1.3; }
+.chr-rail{ opacity:.5; }
+.chr-ember{ fill:url(#chr-gEmber); }
+.chr-area{ fill:url(#chr-gArea); }
+.chr-line{ fill:none; stroke:var(--chr-b3); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+.chr-lineGlow{ fill:none; stroke:var(--chr-glow); stroke-width:3; opacity:.38; filter:url(#chr-fGlow); }
+.chr-pr path{ fill:var(--chr-b4); stroke:var(--chr-s1); stroke-width:2; }
+.chr-dl circle{ fill:var(--chr-s1); stroke:var(--chr-dim); stroke-width:1.7; }
+.chr-dl line{ stroke:var(--chr-dim); stroke-width:1.7; stroke-linecap:round; }
+.chr-start{ fill:var(--chr-s1); stroke:var(--chr-b3); stroke-width:2; }
+.chr-last{ fill:var(--chr-glow); stroke:var(--chr-s1); stroke-width:2; }
+.chr-pulse{
+  fill:none; stroke:var(--chr-glow); stroke-width:1.4;
+  transform-box:view-box; transform-origin:302px 48.1px;   /* sem isso o Safari antigo escala do canto errado */
+  animation:chr-breathe 3s ease-out infinite;
+}
+@keyframes chr-breathe{ 0%{ transform:scale(1); opacity:.5 } 70%,100%{ transform:scale(2.7); opacity:0 } }
+
+/* barras de volume */
+.chr-bar{ fill:url(#chr-gVol); }
+.chr-barHi{ fill:var(--chr-glow); opacity:0; }
+.chr-plotWrap.chr-on .chr-barHi{ opacity:1; }
+.chr-mean{ stroke:var(--chr-dim); stroke-width:1; stroke-dasharray:2 4; opacity:.55; }
+
+/* faixa de meta do peso */
+.chr-meta{ fill:var(--chr-ok); opacity:.13; }
+.chr-metaEdge{ stroke:var(--chr-ok); stroke-width:1; stroke-dasharray:3 3; }
+.chr-dot{ fill:var(--chr-s1); stroke:var(--chr-b3); stroke-width:2; }
+
+/* rotulos dentro do svg */
+.chr-ax{ font-family:var(--chr-mono); font-size:10px; fill:var(--chr-dim); letter-spacing:.04em; }
+.chr-axY{ text-anchor:end; }
+.chr-axSm{ font-family:var(--chr-mono); font-size:9.5px; fill:var(--chr-dim); letter-spacing:.02em; }
+.chr-month{ font-family:var(--chr-mono); font-size:10px; fill:var(--chr-dim); letter-spacing:.14em; text-anchor:middle; }
+.chr-unit{ font-family:var(--chr-mono); font-size:10px; fill:var(--chr-dim); letter-spacing:.12em; }
+.chr-note{ font-family:var(--chr-mono); font-size:9.5px; fill:var(--chr-text); letter-spacing:.02em; }
+.chr-big{ font-family:var(--chr-mono); font-size:13.5px; font-weight:600; fill:var(--chr-text); letter-spacing:-.01em; }
+
+/* crosshair */
+.chr-cross{ opacity:0; transition:opacity .12s ease; }
+.chr-plotWrap.chr-on .chr-cross{ opacity:1; }
+.chr-crossLine{ stroke:var(--chr-dim); stroke-width:1; stroke-dasharray:2 3; opacity:.7; }
+.chr-focus{ fill:var(--chr-bg); stroke:var(--chr-b4); stroke-width:2.5; }
+
+/* ---------- tooltip ---------- */
+.chr-tip{
+  position:absolute; left:0; top:0; z-index:8; pointer-events:none; opacity:0;
+  min-width:122px; max-width:200px; padding:7px 9px 8px; border-radius:11px;
+  background:var(--chr-s2); border:1px solid var(--chr-lineHot);
+  box-shadow:0 10px 24px rgba(0,0,0,.6);
+  font-family:var(--chr-mono); transition:opacity .12s ease;
+}
+.chr-plotWrap.chr-on .chr-tip{ opacity:1; }
+.chr-tipHead{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.chr-tipDate{ font-size:10.5px; color:var(--chr-dim); letter-spacing:.06em; }
+.chr-tipTag{ font-size:9.5px; line-height:1.5; letter-spacing:.08em; padding:1px 5px; border-radius:999px; color:var(--chr-text); white-space:nowrap; }
+.chr-tipTag:empty{ display:none; }
+.chr-tagPr{ background:rgba(255,118,69,.18); border:1px solid rgba(255,118,69,.55); }
+.chr-tagDl{ background:rgba(152,162,177,.12); border:1px solid var(--chr-lineHot); }
+.chr-tagOk{ background:rgba(9,166,107,.16); border:1px solid rgba(9,166,107,.55); }
+.chr-tipMain{ margin-top:3px; display:flex; align-items:baseline; gap:3px; }
+.chr-tipVal{ font-size:19px; font-weight:600; color:var(--chr-text); letter-spacing:-.01em; }
+.chr-tipUn{ font-size:10.5px; color:var(--chr-dim); }
+.chr-tipRow{ margin-top:2px; font-size:10.5px; color:var(--chr-dim); white-space:nowrap; }
+
+/* ---------- rodape / chave de simbolo ---------- */
+.chr-foot{
+  position:relative; display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:4px 10px;
+  margin-top:9px; padding-top:8px; border-top:1px solid var(--chr-line);
+  font-family:var(--chr-mono); font-size:10px; color:var(--chr-dim); letter-spacing:.01em;
+}
+.chr-keys{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
+.chr-key{ display:inline-flex; align-items:center; gap:5px; }
+.chr-keyGlyph{ width:12px; height:12px; display:block; flex:0 0 auto; }
+.chr-gPr{ fill:var(--chr-b4); }
+.chr-gDl{ fill:none; stroke:var(--chr-dim); stroke-width:1.4; stroke-linecap:round; }
+.chr-gMetaF{ fill:var(--chr-ok); opacity:.2; }
+.chr-gMetaL{ stroke:var(--chr-ok); stroke-width:1.2; stroke-dasharray:2 2; }
+.chr-hint{ color:var(--chr-dim); text-align:right; }
+
+/* leitor de tela */
+.chr-live{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+
+/* ---------- movimento reduzido ---------- */
+@media (prefers-reduced-motion: reduce){
+  .chr-pulse{ animation:none; opacity:0; }
+  .chr-cross, .chr-tip{ transition:none; }
+}
+
+  /* chassi da demo neutralizado: o .chr-pack nasceu com max-width 420px pra
+     viver sozinho numa pagina de amostra. Dentro do card da EVOLUCAO
+     (max-w-2xl) ele deve ocupar a largura toda. Especificidade por id, como
+     ja foi feito com o .fg-palco do trilho de brasa. */
+  #evo-chart-aluno.chr-pack, #evo-chart-trainer.chr-pack {
+    max-width: none; margin: 0;
+  }
+  /* a linha de ALVO (meta do plano) — a peca nao tinha, o app tem desde a v23 */
+  .chr-alvo { stroke: #C77400; stroke-width: 1.2; stroke-dasharray: 6 4; fill: none; }
+  .chr-alvoTx { fill: #C77400; }
+  /* modo comparar alunos: so linha, sem area */
+  .chr-lineCmp { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+
+  /* ==================================================================
+     v30.5.0: FREQUENCIA (peca `frequencia`, prefixo .frq-)
+     Colada inteira de _pecas_v30/frequencia.css. Sem :root e sem seletor de
+     elemento nu. Hoje so o bloco do CALENDARIO tem render; o resto do CSS
+     fica sem uso ate os outros blocos entrarem (ver changelog do topo).
+     ================================================================== */
+/* ===== FORJA · pack frequencia + volume + placar · namespace frq- ===== */
+.frq-pack{
+  /* tokens: herda do app se existir, senao usa o valor do tema BRASA ESCURO */
+  --frq-bg:var(--bg,#0B0E13);
+  --frq-s1:var(--surface-1,#12171F);
+  --frq-s2:var(--surface-2,#171E28);
+  --frq-line:var(--line,#242C38);
+  --frq-line-hot:var(--line-hot,#323C4B);
+  --frq-tx:var(--text,#E9EDF3);
+  --frq-dim:var(--text-dim,#98A2B1);
+  --frq-faint:var(--text-faint,#7C8797);
+  --frq-e1:#973101; --frq-e2:#C54302; --frq-e3:#E85616; --frq-e4:#FF7645; --frq-glow:#FF8A4C;
+  --frq-ok:#09A66B; --frq-car:#0598CE; --frq-bad:#EB4D45; --frq-null:#2A3340;
+  --frq-disp:'Bebas Neue',Impact,sans-serif;
+  --frq-body:'DM Sans',system-ui,-apple-system,sans-serif;
+  --frq-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  position:relative;
+  display:grid;
+  gap:12px;
+  width:100%;
+  max-width:390px;
+  margin:0 auto;
+  font-family:var(--frq-body);
+  color:var(--frq-tx);
+  -webkit-tap-highlight-color:transparent;
+}
+.frq-pack *{box-sizing:border-box}
+.frq-pack button{margin:0;font-family:inherit;color:inherit;background:none;border:0;appearance:none}
+
+/* ---------- card base: aco escovado + graos + rebites ---------- */
+.frq-card{
+  position:relative;
+  overflow:hidden;
+  padding:14px;
+  border:1px solid var(--frq-line);
+  border-radius:16px;
+  background:
+    /* rebites dos 4 cantos */
+    radial-gradient(2.6px 2.6px at 10px 10px, rgba(233,237,243,.13) 0 45%, rgba(11,14,19,.55) 55% 100%, rgba(11,14,19,0) 100%),
+    radial-gradient(2.6px 2.6px at calc(100% - 10px) 10px, rgba(233,237,243,.13) 0 45%, rgba(11,14,19,.55) 55% 100%, rgba(11,14,19,0) 100%),
+    radial-gradient(2.6px 2.6px at 10px calc(100% - 10px), rgba(233,237,243,.10) 0 45%, rgba(11,14,19,.55) 55% 100%, rgba(11,14,19,0) 100%),
+    radial-gradient(2.6px 2.6px at calc(100% - 10px) calc(100% - 10px), rgba(233,237,243,.10) 0 45%, rgba(11,14,19,.55) 55% 100%, rgba(11,14,19,0) 100%),
+    /* halo de brasa no canto superior direito */
+    radial-gradient(120% 90% at 100% 0%, rgba(255,118,69,.06), rgba(255,118,69,0) 62%),
+    /* aco escovado */
+    repeating-linear-gradient(115deg, rgba(233,237,243,.020) 0 1px, rgba(233,237,243,0) 1px 6px),
+    repeating-linear-gradient(115deg, rgba(11,14,19,.20) 0 1px, rgba(11,14,19,0) 1px 13px),
+    var(--frq-s1);
+  background-repeat:no-repeat;
+}
+.frq-card::before{ /* fio de brasa no topo */
+  content:"";position:absolute;top:0;left:14px;width:46px;height:2px;border-radius:0 0 2px 2px;
+  background:linear-gradient(90deg,var(--frq-glow),var(--frq-e2) 68%,rgba(151,49,1,0));
+}
+.frq-card::after{ /* grao fino (feTurbulence em data-URI, sem arquivo externo) */
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='frq-nz'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23frq-nz)'/%3E%3C/svg%3E");
+  background-size:120px 120px;
+}
+.frq-card>*{position:relative;z-index:1}
+
+.frq-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin:2px 0 10px}
+.frq-kick{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--frq-dim);margin:0 0 3px}
+.frq-title{font-family:var(--frq-disp);font-size:21px;line-height:1;letter-spacing:.02em;margin:0;color:var(--frq-tx)}
+.frq-sub{font-size:10.5px;line-height:1.28;color:var(--frq-dim);margin:0;text-align:right;max-width:46%}
+
+/* ---------- 1 · calendario mapa de calor ---------- */
+.frq-dow,.frq-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.frq-dow{margin-bottom:6px}
+.frq-dow span{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.06em;color:var(--frq-dim);text-align:center}
+.frq-c{
+  position:relative;min-height:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  padding:0;border:1px solid transparent;border-radius:11px;
+  background:var(--frq-null);color:var(--frq-dim);
+  font-family:var(--frq-mono);cursor:pointer;
+  transition:filter .14s ease, transform .14s ease;
+}
+.frq-n{position:absolute;top:3px;left:5px;font-size:10.5px;line-height:1;font-weight:500}
+.frq-g{display:flex;align-items:center;justify-content:center;margin-top:7px;font-size:14px;font-weight:700;line-height:1}
+.frq-g svg{display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.frq-g--dot{width:7px;height:7px;border-radius:999px;background:currentColor}
+.frq-c--str{background:var(--frq-ok);color:#08110C}
+.frq-c--car{background:var(--frq-car);color:#04121A}
+.frq-c--miss{background:var(--frq-bad);color:#1A0806}
+.frq-c--none{background:var(--frq-null);color:var(--frq-dim)}
+.frq-c--fut{background:transparent;border:1px dashed var(--frq-faint);color:var(--frq-dim)}
+.frq-c--pad{background:transparent;border:0;pointer-events:none;cursor:default}
+.frq-c:not(.frq-c--pad):hover{filter:brightness(1.14);transform:translateY(-1px)}
+.frq-c:focus-visible{outline:2px solid var(--frq-glow);outline-offset:2px}
+.frq-c--today{outline:2px solid var(--frq-glow);outline-offset:2px;animation:frq-brasa 2.6s ease-in-out infinite}
+@keyframes frq-brasa{0%,100%{box-shadow:0 0 0 0 rgba(255,138,76,0)}50%{box-shadow:0 0 12px 1px rgba(255,138,76,.32)}}
+
+.frq-leg{display:flex;flex-wrap:wrap;gap:7px 12px;list-style:none;margin:11px 0 0;padding:10px 0 0;border-top:1px solid var(--frq-line)}
+.frq-leg li{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--frq-dim)}
+.frq-sw{width:20px;height:20px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-family:var(--frq-mono);font-size:11px;font-weight:700}
+.frq-sw svg{display:block;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.frq-sw--str{background:var(--frq-ok);color:#08110C}
+.frq-sw--car{background:var(--frq-car);color:#04121A}
+.frq-sw--miss{background:var(--frq-bad);color:#1A0806}
+.frq-sw--none{background:var(--frq-null);color:var(--frq-dim)}
+.frq-sw--none i{width:7px;height:7px;border-radius:999px;background:currentColor;display:block}
+.frq-sw--fut{background:transparent;border:1px dashed var(--frq-faint)}
+
+/* ---------- 2 · volume por grupo ---------- */
+.frq-bars{display:block;width:100%;height:auto}
+.frq-rail{fill:var(--frq-s2);stroke:var(--frq-line);stroke-width:1}
+.frq-b{transition:filter .14s ease}
+.frq-row{cursor:pointer}
+.frq-row:hover .frq-b,.frq-row:focus .frq-b{filter:brightness(1.16)}
+.frq-row:focus{outline:none}
+.frq-row:focus-visible .frq-hit{fill:rgba(255,138,76,.10);stroke:var(--frq-glow);stroke-width:1}
+.frq-hit{fill:transparent}
+.frq-gap{fill:url(#frq-hatch)}
+.frq-hl{stroke:var(--frq-line-hot);stroke-width:2}
+.frq-glabel{font-family:var(--frq-mono);font-size:10.5px;letter-spacing:.04em;fill:var(--frq-dim)}
+.frq-gval{font-family:var(--frq-mono);font-size:11.5px;font-weight:600;fill:var(--frq-tx)}
+.frq-metal{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.12em;fill:var(--frq-dim)}
+.frq-tickl{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.06em;fill:var(--frq-dim)}
+.frq-axis,.frq-tick{stroke:var(--frq-line);stroke-width:1}
+.frq-tick--maj{stroke:var(--frq-line-hot)}
+.frq-zero{stroke:var(--frq-line-hot);stroke-width:1}
+.frq-meta-bk{stroke:#0B0E13;stroke-width:4;opacity:.6}
+.frq-meta{stroke:var(--frq-dim);stroke-width:1.5;stroke-dasharray:4 3}
+.frq-note{display:flex;align-items:center;gap:7px;margin:9px 0 0;font-size:10px;line-height:1.3;color:var(--frq-dim)}
+.frq-note i{
+  width:18px;height:12px;flex:0 0 auto;border-radius:3px;border:1px solid var(--frq-line);
+  background:repeating-linear-gradient(45deg,var(--frq-line-hot) 0 2px,rgba(0,0,0,0) 2px 6px);
+}
+
+/* ---------- 3 · aneis de consistencia ---------- */
+.frq-rings{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.frq-ring{display:flex;flex-direction:column;align-items:center;gap:7px;padding:6px 2px 4px;background:transparent;border-radius:11px;cursor:pointer;min-height:44px}
+.frq-ring:focus-visible{outline:2px solid var(--frq-glow);outline-offset:2px}
+.frq-ring-svg{display:block;width:100%;max-width:96px;height:auto}
+.frq-notch{fill:none;stroke:var(--frq-line);stroke-width:2.5;stroke-dasharray:2 10.3}
+.frq-trk{fill:none;stroke:var(--frq-null);stroke-width:8}
+.frq-arc{
+  fill:none;stroke:url(#frq-grad-arc);stroke-width:8;stroke-linecap:round;
+  stroke-dasharray:257.61;stroke-dashoffset:var(--frq-off,257.61);
+  animation:frq-arc-in .9s cubic-bezier(.22,.9,.3,1) both;
+}
+@keyframes frq-arc-in{from{stroke-dashoffset:257.61}to{stroke-dashoffset:var(--frq-off,257.61)}}
+.frq-ricon{fill:none;stroke:var(--frq-dim);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.frq-ricon-dot{fill:var(--frq-dim);stroke:none}
+.frq-rnum{font-family:var(--frq-disp);font-size:32px;letter-spacing:.01em;fill:var(--frq-tx);text-anchor:middle}
+.frq-runit{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.1em;fill:var(--frq-dim);text-anchor:middle}
+.frq-rlab{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--frq-dim);text-align:center;line-height:1.25}
+.frq-ring:hover .frq-arc{filter:brightness(1.14)}
+
+/* ---------- 4 · placar / stat tiles ---------- */
+.frq-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.frq-tile{
+  display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  min-height:104px;padding:10px 11px;text-align:left;
+  border:1px solid var(--frq-line);border-radius:11px;background:var(--frq-s2);cursor:pointer;
+  transition:border-color .14s ease, transform .14s ease;
+}
+.frq-tile:hover{border-color:var(--frq-line-hot);transform:translateY(-1px)}
+.frq-tile:focus-visible{outline:2px solid var(--frq-glow);outline-offset:2px}
+.frq-tlab{font-family:var(--frq-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--frq-dim)}
+.frq-thero{font-family:var(--frq-disp);font-size:32px;line-height:.92;letter-spacing:.01em;color:var(--frq-tx);display:flex;align-items:baseline;gap:4px}
+.frq-tunit{font-family:var(--frq-mono);font-size:10px;font-weight:500;color:var(--frq-dim);letter-spacing:.04em}
+.frq-delta{display:flex;align-items:center;gap:5px;font-family:var(--frq-mono);font-size:11px;font-weight:600;color:var(--frq-tx);margin-top:1px}
+.frq-arw{width:11px;height:11px;flex:0 0 auto;display:block}
+.frq-delta--good .frq-arw{fill:var(--frq-ok)}
+.frq-delta--bad .frq-arw{fill:var(--frq-bad)}
+.frq-delta--flat .frq-arw{fill:var(--frq-dim)}
+.frq-spark{display:block;width:100%;height:auto;margin-top:auto}
+.frq-spark-l{fill:none;stroke:var(--frq-e3);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.frq-spark-d{fill:var(--frq-e4);stroke:var(--frq-s2);stroke-width:2}
+
+/* ---------- tooltip compartilhado ---------- */
+.frq-tip{
+  position:absolute;top:0;left:0;z-index:9;
+  max-width:214px;padding:8px 10px;
+  border:1px solid var(--frq-line-hot);border-radius:11px;
+  background:rgba(11,14,19,.97);
+  box-shadow:0 8px 22px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity .12s ease;
+}
+.frq-tip--on{opacity:1;visibility:visible}
+.frq-tip-t{font-family:var(--frq-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--frq-glow);white-space:nowrap}
+.frq-tip-b{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.frq-tip-l{font-size:11px;line-height:1.3;color:var(--frq-tx)}
+.frq-tip-l+.frq-tip-l{color:var(--frq-dim)}
+
+@media (prefers-reduced-motion:reduce){
+  .frq-pack *,.frq-pack *::before,.frq-pack *::after{animation:none!important;transition:none!important}
+  .frq-c--today{box-shadow:none}
+}
+/* telas menores que 390: aperta padding e gap, nunca a altura do alvo */
+@media (max-width:359px){
+  .frq-card{padding:14px 8px}
+  .frq-dow,.frq-cal{gap:3px}
+  .frq-title{font-size:19px}
+  .frq-thero{font-size:28px}
+}
+
+  /* chassi da demo neutralizado, igual ao .chr-pack e ao .fg-palco */
+  #evo-calendario-aluno .frq-pack, #evo-calendario-trainer .frq-pack {
+    max-width: none; margin: 0;
+  }
+  /* navegacao de mes: alvo de toque de verdade (era px-2 em texto, ~24px) */
+  .frq-nav {
+    min-width: 44px; min-height: 44px; display: flex; align-items: center;
+    justify-content: center; background: none; border: 0; cursor: pointer;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  }
+  .frq-nav:hover { color: var(--text); }
+  .frq-nav:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+  /* ===================================================================
+     v30 JOGO DE ICONES (prefixo icn-) — 36 simbolos no grid 24x24, traco
+     ~1.7px real, cantos redondos, tudo por currentColor. Entra no lugar
+     dos emoji FUNCIONAIS (balanca, bicicleta, trofeu, chama, musculo,
+     raio, alvo, cronometro).
+     Motivo: emoji e desenhado pelo SISTEMA — muda de aparelho pra
+     aparelho, ignora o tema BRASA e nao herda a cor de estado do app.
+     Simbolo de traco herda tudo isso de graca.
+     COLAR NO FIM DO <style> principal (o que fecha na linha ~2069), depois
+     do bloco do FEED MOTIVACIONAL. A ordem nao e mais critica: as regras
+     do feed abaixo foram feitas com especificidade maior que as do v29.2.0
+     de proposito (ver comentario la embaixo).
+     =================================================================== */
+
+  /* o sprite mora no DOM mas nao ocupa espaco. Mesma receita do .img-defs
+     (linha 1673) que ja funciona neste arquivo. NUNCA display:none aqui:
+     em alguns motores isso mata o <use> e o simbolo nao pinta. */
+  .icn-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+  .icn {
+    --icn-size: 24px;
+    --icn-w: 1.75;
+    --icn-hot: currentColor;      /* detalhe em brasa; sem tema fica mono */
+    width: var(--icn-size); height: var(--icn-size);
+    /* o preflight do Tailwind (linha 401) tem svg{display:block}. Sem este
+       inline-block todo icone quebraria a linha dentro do botao. */
+    display: inline-block; flex: 0 0 auto;
+    /* -0.3em poe o centro do desenho na altura do centro da CAIXA ALTA da
+       JetBrains Mono (os rotulos do app sao uppercase), nao na do x. */
+    vertical-align: -0.3em;
+    fill: none; stroke: currentColor; stroke-width: var(--icn-w);
+    stroke-linecap: round; stroke-linejoin: round;
+    /* icone NUNCA e alvo de clique: se um dia algum handler do app virar
+       delegado por ev.target.closest/dataset, um <svg> no meio do caminho
+       quebraria silenciosamente. Custa uma linha e fecha a classe de bug. */
+    pointer-events: none;
+  }
+
+  /* o traco compensa a escala pra manter ~1.7px reais na tela:
+     24 = 1.75 · 20 = 2.05/24 -> 1.71px · 16 = 2.5/24 -> 1.67px.
+     NENHUM simbolo do sprite tem stroke-width proprio, senao nao acompanha. */
+  .icn--16 { --icn-size: 16px; --icn-w: 2.5; }
+  .icn--20 { --icn-size: 20px; --icn-w: 2.05; }
+  .icn--24 { --icn-size: 24px; --icn-w: 1.75; }
+  .icn--28 { --icn-size: 28px; --icn-w: 1.55; }
+  .icn--32 { --icn-size: 32px; --icn-w: 1.4; }
+
+  /* icone que anda DENTRO de uma linha de texto de tamanho variavel: escala
+     em em. E o caso de cardioEmoji(), que pinta em dois contextos bem
+     diferentes — o sub do card CARDIO (9px) e o historico do modal (12px).
+     Tamanho fixo ali seria gigante num e certo no outro.
+     --icn-w 2.6 da ~1.4px de traco a 9px e ~1.8px a 12px: os dois leem. */
+  .icn--inline { --icn-size: 1.4em; --icn-w: 2.6; }
+
+  /* alinhamento pelo meio: usado onde o icone divide a linha com GLIFOS da
+     mono (▲ ▼ ✕ na tabela do trainer). O -0.3em padrao e calibrado pra
+     caixa alta e ali desalinharia do triangulo do lado. Declarado DEPOIS
+     de .icn--inline pra vencer quando os dois estiverem juntos. */
+  .icn--mid { vertical-align: middle; }
+
+  /* cor sempre por currentColor, nunca fill fixo no simbolo.
+     Medido sobre #12171F: --text-dim 6.97:1 · --acc-ink 6.79:1 ·
+     --ok-ink 9.85:1 · --accent-d 5.46:1. --text-faint (3.96:1) fica de fora. */
+  .icn--dim    { color: var(--text-dim); }
+  .icn--fogo   { color: var(--acc-ink); }
+  .icn--feito  { color: var(--ok-ink); }
+  .icn--cardio { color: var(--accent-d); }
+  .icn--falta  { color: var(--falta); }
+  .icn--brasa  { --icn-hot: var(--brasa-4); }
+
+  /* botao com icone: vira flex pra alinhar desenho e texto pelo centro sem
+     depender de metrica de fonte (o .btn e mono/uppercase e a altura da
+     caixa alta varia por aparelho). Os 4 CTAs que usam isso sao itens de
+     grid, entao o inline-flex ja e blocado pelo proprio grid — o layout
+     deles nao muda. */
+  .btn-ico { display: inline-flex; align-items: center; justify-content: center; gap: .55em; line-height: 1.15; }
+
+  /* FEED MOTIVACIONAL: o tamanho do icone acompanha o TIER do card, que ja
+     estava definido no bloco v29.2.0 pelo font-size do emoji. Zera o
+     font-size (o svg nao usa) e mata a meia-linha de altura que sobrava
+     embaixo do simbolo.
+     O [class] existe pra subir a especificidade pra 0,3,0: as regras
+     .feed-card--md .fc-emoji e .feed-card--lg .fc-emoji (linhas 631/643)
+     sao 0,2,0 e empatariam — dependendo so da ordem de colagem. Com o
+     [class] este bloco vence esteja onde estiver no <style>. */
+  .feed-card[class] .fc-emoji { display: inline-flex; align-items: center; font-size: 0; line-height: 0; }
+  .fc-emoji .icn                { --icn-size: 20px; --icn-w: 2.05; vertical-align: baseline; }
+  .feed-card--md .fc-emoji .icn { --icn-size: 24px; --icn-w: 1.75; }
+  .feed-card--lg .fc-emoji .icn { --icn-size: 30px; --icn-w: 1.5; }
+
+  /* campeao: medalha em tinta de texto com o miolo em brasa (6.79:1).
+     streak: chama em brasa clara — o card md e verde, e o --acc (#E85616)
+     ali ficava abafado; --acc-ink separa do fundo tingido. */
+  .fc-icn--campeao { color: var(--text); --icn-hot: var(--acc-ink); }
+  .fc-icn--streak  { color: var(--acc-ink); --icn-hot: var(--brasa-glow); }
+  .fc-icn--semana  { color: var(--ok-ink); }
+  .fc-icn--treinou { color: var(--ok-ink); }
+
+  /* nada aqui anima; se um dia animar, so transform/opacity. */
+  @media (prefers-reduced-motion: reduce) {
+    .icn { transition: none; animation: none; }
+  }
+
   /* --- 6. SCROLL HORIZONTAL DA PAGINA ---
      Tabela larga (plano do trainer, historico) empurrava o BODY pra rolar de
      lado: a tela inteira desliza e o cabecalho sai do lugar. Rolar dentro do
@@ -2662,6 +3508,311 @@
       <rect x="11.1" y="16.3" width="1.8" height="1.8" rx=".9" stroke="none"/>
     </symbol>
   </svg>
+<!-- ====================================================================
+     v30 SPRITE DO JOGO DE ICONES (prefixo icn-).
+     COLAR imediatamente APOS o </svg> que fecha o <svg class="img-defs">
+     que ja existe logo abaixo de <body> (linha ~2356). Ficar ao lado do
+     sprite que ja funciona e a colocacao mais segura: mesma posicao no
+     DOM, mesma tecnica de esconder.
+     36 simbolos no grid 24x24. Sem <defs>: nenhum destes simbolos usa
+     gradiente, pattern ou filtro (isso era so das cenas ilustradas da
+     peca), entao nao ha paint server pra registrar nem id extra pra
+     colidir. Conferido: nenhum id/classe comecando por icn- existe no
+     arquivo antes desta integracao.
+     ==================================================================== -->
+<svg class="icn-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ---------- equipamento ---------- -->
+
+  <!-- barra olimpica: haste cortada nas anilhas pra nao riscar as chapas -->
+  <symbol id="icn-barra" viewBox="0 0 24 24">
+    <path d="M2.4 12h.8M5.8 12h1.1M9.3 12h5.4M17.1 12h1.1M20.8 12h.8"/>
+    <rect x="3.2" y="6.6" width="2.6" height="10.8" rx="1.3"/>
+    <rect x="6.9" y="8.6" width="2.4" height="6.8" rx="1.2"/>
+    <rect x="14.7" y="8.6" width="2.4" height="6.8" rx="1.2"/>
+    <rect x="18.2" y="6.6" width="2.6" height="10.8" rx="1.3"/>
+  </symbol>
+
+  <!-- halter -->
+  <symbol id="icn-halter" viewBox="0 0 24 24">
+    <path d="M3 9.2v5.6M21 9.2v5.6"/>
+    <rect x="4.9" y="7.2" width="3.2" height="9.6" rx="1.5"/>
+    <path d="M8.1 12h7.8"/>
+    <rect x="15.9" y="7.2" width="3.2" height="9.6" rx="1.5"/>
+  </symbol>
+
+  <!-- anilha: furo central e 4 pegas -->
+  <symbol id="icn-anilha" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9"/>
+    <circle cx="12" cy="12" r="3.1"/>
+    <path d="M15.1 8.9 17.4 6.6M8.9 8.9 6.6 6.6M8.9 15.1 6.6 17.4M15.1 15.1l2.3 2.3"/>
+  </symbol>
+
+  <!-- kettlebell -->
+  <symbol id="icn-kettlebell" viewBox="0 0 24 24">
+    <path d="M8.7 11.9V9.4a3.3 3.3 0 0 1 6.6 0v2.5"/>
+    <path d="M15.3 11.9c2.7 1.5 4 4.1 3.2 6.6-.5 1.6-1.8 2.5-3.4 2.5H8.9c-1.6 0-2.9-.9-3.4-2.5-.8-2.5.5-5.1 3.2-6.6z"/>
+  </symbol>
+
+  <!-- maquina de pilha: coluna unica, pilha encostada nela (sem traco cruzando) -->
+  <symbol id="icn-maquina" viewBox="0 0 24 24">
+    <path d="M2.6 21.2h18.8"/>
+    <path d="M18.6 21.2V4.6"/>
+    <path d="M18.6 4.6H6.2"/>
+    <circle cx="6.2" cy="6.2" r="1.6"/>
+    <path d="M6.2 7.8v2.6"/>
+    <path d="M3 10.4h6.4"/>
+    <path d="M3 10.4v2M9.4 10.4v2"/>
+    <rect x="12.8" y="10.8" width="5.8" height="8.6" rx="1.2"/>
+    <path d="M12.8 13.7h5.8M12.8 16.6h5.8"/>
+  </symbol>
+
+  <!-- cabo: roldana no teto + pegador em D (nao confunde com kettlebell) -->
+  <symbol id="icn-cabo" viewBox="0 0 24 24">
+    <path d="M3.4 3.2h17.2"/>
+    <path d="M12 3.2v1.2"/>
+    <circle cx="12" cy="6.4" r="2.6"/>
+    <circle cx="12" cy="6.4" r=".9" fill="currentColor" stroke="none"/>
+    <path d="M12 9v4.2"/>
+    <path d="M9.2 13.2h5.6"/>
+    <path d="M9.2 13.2c-1.4 3.2-.4 6.6 2.8 7.4 3.2-.8 4.2-4.2 2.8-7.4"/>
+  </symbol>
+
+  <!-- banco reto -->
+  <symbol id="icn-banco" viewBox="0 0 24 24">
+    <rect x="3" y="7.4" width="18" height="3.4" rx="1.7"/>
+    <path d="M7 10.8v7.7M17 10.8v7.7"/>
+    <path d="M4.6 18.5h4.8M14.6 18.5h4.8"/>
+  </symbol>
+
+  <!-- bigorna: marca do app -->
+  <symbol id="icn-bigorna" viewBox="0 0 24 24">
+    <path d="M5 7.4h15.4v2.9h-4.8l-1 4h1.8L18 18.6H6l1.6-4.3h1.8l-1-4H4.3L2.6 9.4z"/>
+  </symbol>
+
+  <!-- corda de triceps -->
+  <symbol id="icn-corda" viewBox="0 0 24 24">
+    <rect x="10.2" y="2.4" width="3.6" height="4.4" rx="1.8"/>
+    <path d="M11.2 6.8c-1.6 3-3.6 4.3-4.6 7.6"/>
+    <path d="M12.8 6.8c1.6 3 3.6 4.3 4.6 7.6"/>
+    <rect x="4.7" y="14" width="3.2" height="6.6" rx="1.6" transform="rotate(-14 6.3 17.3)"/>
+    <rect x="16.1" y="14" width="3.2" height="6.6" rx="1.6" transform="rotate(14 17.7 17.3)"/>
+  </symbol>
+
+  <!-- ---------- cardio ---------- -->
+
+  <!-- bicicleta ergometrica: roda de inercia livre do quadro -->
+  <symbol id="icn-bike" viewBox="0 0 24 24">
+    <path d="M2.6 20.8h6.2M13.6 20.8h7.2"/>
+    <circle cx="5.7" cy="15" r="3.1"/>
+    <circle cx="5.7" cy="15" r=".95" fill="currentColor" stroke="none"/>
+    <path d="M5.7 18.1v2.7"/>
+    <path d="M8.3 13 10.2 5.6"/>
+    <path d="M7.9 5.6h4.8"/>
+    <path d="M17.2 20.8 14.6 10.4"/>
+    <rect x="11.6" y="7.9" width="6" height="2.5" rx="1.25"/>
+    <path d="M8.7 11.9 12.4 16.2"/>
+    <path d="M12.4 16.2 10.3 18.5"/>
+  </symbol>
+
+  <!-- esteira: ripas da lona no lugar dos rolos (escalam com o traco) -->
+  <symbol id="icn-esteira" viewBox="0 0 24 24">
+    <rect x="2.2" y="15.6" width="15.6" height="4.4" rx="2.2"/>
+    <path d="M5.4 16.9v1.8M9 16.9v1.8M12.6 16.9v1.8"/>
+    <path d="M15.4 15.6 18.2 8.6"/>
+    <rect x="14.6" y="4.2" width="7.2" height="4.4" rx="1.4"/>
+    <path d="M14.6 6.4h-3.4M11.2 6.4v2"/>
+  </symbol>
+
+  <!-- remo ergometro: gaiola, trilho, banco e pegador em T -->
+  <symbol id="icn-remo" viewBox="0 0 24 24">
+    <circle cx="5.6" cy="8" r="3.6"/>
+    <circle cx="5.6" cy="8" r="1" fill="currentColor" stroke="none"/>
+    <path d="M5.6 11.6v6.6"/>
+    <path d="M2.8 18.2h5.6"/>
+    <path d="M7.6 15.2h13.2"/>
+    <path d="M18.6 15.2v3M16.2 18.2h4.8"/>
+    <rect x="10.4" y="12" width="5" height="3.2" rx="1.3"/>
+    <path d="M9.2 9.4h3.4"/>
+    <path d="M12.6 8.2v2.4"/>
+  </symbol>
+
+  <!-- ---------- acoes do app ---------- -->
+
+  <!-- treinar: martelo de forja -->
+  <symbol id="icn-treinar" viewBox="0 0 24 24">
+    <g transform="rotate(-38 12 12)">
+      <rect x="5.6" y="4.4" width="10.4" height="5.2" rx="1.6"/>
+      <path d="M10.8 9.6v9.4"/>
+      <path d="M9.3 12.6h3"/>
+    </g>
+  </symbol>
+
+  <!-- lancar sessao: registro entrando na caixa -->
+  <symbol id="icn-lancar" viewBox="0 0 24 24">
+    <path d="M12 3.2v8.6"/>
+    <path d="M8.6 8.6 12 12l3.4-3.4"/>
+    <path d="M3.4 14.4h4.4l1.3 2.3h5.8l1.3-2.3h4.4v4.2a1.9 1.9 0 0 1-1.9 1.9H5.3a1.9 1.9 0 0 1-1.9-1.9z"/>
+  </symbol>
+
+  <!-- evolucao -->
+  <symbol id="icn-evolucao" viewBox="0 0 24 24">
+    <path d="M3.6 3.4v15.4a1.6 1.6 0 0 0 1.6 1.6h15.2"/>
+    <path d="M6.6 15.6 10.4 11.2l3.2 2.4L19.1 6.7"/>
+    <path d="M15.4 6.7h3.7v3.7"/>
+  </symbol>
+
+  <!-- peso corporal: balanca -->
+  <symbol id="icn-peso" viewBox="0 0 24 24">
+    <rect x="3" y="4.6" width="18" height="14.8" rx="2.8"/>
+    <path d="M7.5 10a4.8 4.8 0 0 1 9 0"/>
+    <path d="M12 11.6 13.7 8.7"/>
+    <circle cx="12" cy="11.6" r=".9" fill="currentColor" stroke="none"/>
+    <rect x="8.6" y="14.6" width="6.8" height="2.9" rx="1.45"/>
+  </symbol>
+
+  <!-- fita metrica: cintura -->
+  <symbol id="icn-fita" viewBox="0 0 24 24">
+    <rect x="2.4" y="8.2" width="19.2" height="7.6" rx="2.2"/>
+    <path d="M6.4 8.2v3M9.6 8.2v4.4M12.8 8.2v3M16 8.2v4.4M19.2 8.2v3"/>
+  </symbol>
+
+  <!-- calendario -->
+  <symbol id="icn-calendario" viewBox="0 0 24 24">
+    <rect x="3" y="5" width="18" height="16" rx="2.6"/>
+    <path d="M3 9.6h18"/>
+    <path d="M8 3v4M16 3v4"/>
+    <circle cx="8" cy="13.6" r="1.15" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="13.6" r="1.15" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="13.6" r="1.15" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="17.4" r="1.15" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="17.4" r="1.15" fill="currentColor" stroke="none"/>
+  </symbol>
+
+  <!-- cronometro de descanso -->
+  <symbol id="icn-cronometro" viewBox="0 0 24 24">
+    <circle cx="12" cy="13.6" r="7.6"/>
+    <path d="M9.4 2.8h5.2M12 2.8V6"/>
+    <path d="M12 9.6v4h3.3"/>
+    <path d="M18.6 7.6 20.3 5.9"/>
+  </symbol>
+
+  <!-- pausa / descanso entre series -->
+  <symbol id="icn-descanso" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.6"/>
+    <path d="M10.1 8.8v6.4M13.9 8.8v6.4"/>
+  </symbol>
+
+  <!-- historico -->
+  <symbol id="icn-historico" viewBox="0 0 24 24">
+    <path d="M5.1 7.2A8.4 8.4 0 1 1 3.6 12"/>
+    <path d="M1.9 4.2 5.1 7.2 8.4 6.1"/>
+    <path d="M12 7.8V12l3.2 2"/>
+  </symbol>
+
+  <!-- ficha / plano / console -->
+  <symbol id="icn-ficha" viewBox="0 0 24 24">
+    <path d="M9 4.4H6.2a2 2 0 0 0-2 2v12.4a2 2 0 0 0 2 2h11.6a2 2 0 0 0 2-2V6.4a2 2 0 0 0-2-2H15"/>
+    <rect x="8.8" y="2.4" width="6.4" height="4" rx="1.6"/>
+    <path d="M8.2 11.4h7.6M8.2 14.9h7.6M8.2 18.4H13"/>
+  </symbol>
+
+  <!-- aluno -->
+  <symbol id="icn-aluno" viewBox="0 0 24 24">
+    <circle cx="12" cy="7.6" r="3.9"/>
+    <path d="M4.4 20.6a7.6 7.6 0 0 1 15.2 0"/>
+  </symbol>
+
+  <!-- filtro -->
+  <symbol id="icn-filtro" viewBox="0 0 24 24">
+    <path d="M3.4 4.8h17.2l-6.6 7.8v6.6l-4-2.2v-4.4z"/>
+  </symbol>
+
+  <!-- ajustes -->
+  <symbol id="icn-ajustes" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="7.6"/>
+    <circle cx="12" cy="12" r="3.2"/>
+    <path d="M19.6 12h2M2.4 12h2M15.8 5.4l1-1.7M7.2 20.3l1-1.7M16.8 20.3l-1-1.7M8.2 5.4l-1-1.7"/>
+  </symbol>
+
+  <!-- sincronizar -->
+  <symbol id="icn-sincronizar" viewBox="0 0 24 24">
+    <path d="M3.5 12A8.5 8.5 0 0 1 18 6"/>
+    <path d="M18 2.2V6h-3.8"/>
+    <path d="M20.5 12A8.5 8.5 0 0 1 6 18"/>
+    <path d="M6 21.8V18h3.8"/>
+  </symbol>
+
+  <!-- sair -->
+  <symbol id="icn-sair" viewBox="0 0 24 24">
+    <path d="M9.6 3.6H5.6a2.1 2.1 0 0 0-2.1 2.1v12.6a2.1 2.1 0 0 0 2.1 2.1h4"/>
+    <path d="M10 12h10.5"/>
+    <path d="M17.1 8.6 20.5 12l-3.4 3.4"/>
+  </symbol>
+
+  <!-- editar -->
+  <symbol id="icn-editar" viewBox="0 0 24 24">
+    <path d="M3 21l1.3-4.3L16.4 4.6a2.2 2.2 0 0 1 3.1 3.1L7.3 19.7z"/>
+    <path d="M14.4 6.6 17.4 9.6"/>
+  </symbol>
+
+  <!-- apagar -->
+  <symbol id="icn-apagar" viewBox="0 0 24 24">
+    <path d="M3.6 6.6h16.8"/>
+    <path d="M9 6.6V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.6"/>
+    <path d="M5.6 6.6 6.5 19.3A1.9 1.9 0 0 0 8.4 21h7.2a1.9 1.9 0 0 0 1.9-1.7l.9-12.7"/>
+    <path d="M10.2 10.6v6.4M13.8 10.6v6.4"/>
+  </symbol>
+
+  <!-- adicionar -->
+  <symbol id="icn-adicionar" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.6"/>
+    <path d="M12 8.2v7.6M8.2 12h7.6"/>
+  </symbol>
+
+  <!-- confirmar -->
+  <symbol id="icn-confirmar" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.6"/>
+    <path d="M8.1 12.3 10.9 15.1 15.9 9.1"/>
+  </symbol>
+
+  <!-- visto solto: pra chip/card de status feito -->
+  <symbol id="icn-visto" viewBox="0 0 24 24">
+    <path d="M4.4 12.6 9.4 17.6 19.6 6.6"/>
+  </symbol>
+
+  <!-- alerta -->
+  <symbol id="icn-alerta" viewBox="0 0 24 24">
+    <path d="M12 3.8 20.8 19.1a1.4 1.4 0 0 1-1.2 2.1H4.4a1.4 1.4 0 0 1-1.2-2.1z"/>
+    <path d="M12 9.6v4.8"/>
+    <circle cx="12" cy="17.6" r="1.15" fill="currentColor" stroke="none"/>
+  </symbol>
+
+  <!-- ---------- conquista ---------- -->
+
+  <!-- medalha (miolo em brasa) -->
+  <symbol id="icn-medalha" viewBox="0 0 24 24">
+    <path d="M7.6 2.8 10.8 8.6M16.4 2.8 13.2 8.6"/>
+    <circle cx="12" cy="15.2" r="6"/>
+    <circle cx="12" cy="15.2" r="2.5" style="stroke:var(--icn-hot,currentColor)"/>
+  </symbol>
+
+  <!-- chama de streak (lingua interna em brasa) -->
+  <symbol id="icn-chama" viewBox="0 0 24 24">
+    <path d="M12 2.8c1.6 3.2 3.6 4.6 5 6.8 1.6 2.5 1.2 6-.9 8.1a6.9 6.9 0 0 1-9.7 0C4.2 15.5 4 11.8 6 9.2c.5 1.5 1.6 2.1 2.6 2.2 1.1.1 1.9-.9 1.9-2.3 0-1.5.4-3.9 1.5-6.3z"/>
+    <path d="M12 18.9a2.9 2.9 0 0 1-2-4.9c1-1 1.6-1.9 2-3 .7 1.1 1.2 1.8 2 2.5a2.9 2.9 0 0 1-2 5.4z" style="stroke:var(--icn-hot,currentColor)"/>
+  </symbol>
+
+  <!-- recorde / PR (seta interna em brasa) -->
+  <symbol id="icn-recorde" viewBox="0 0 24 24">
+    <path d="M7.4 3.6h9.2v5.2a4.6 4.6 0 0 1-9.2 0z"/>
+    <path d="M7.4 5.2H5.4a2.3 2.3 0 0 0 2.4 3.3"/>
+    <path d="M16.6 5.2h2a2.3 2.3 0 0 1-2.4 3.3"/>
+    <path d="M12 13.4v3.4"/>
+    <path d="M8.2 20.6h7.6l-1.4-3.8H9.6z"/>
+    <path d="M9.9 7.6 12 5.5l2.1 2.1" style="stroke:var(--icn-hot,currentColor)"/>
+  </symbol>
+</svg>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
@@ -2683,7 +3834,11 @@
 <!-- VERSION UPDATE MODAL -->
 <div id="version-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden">
   <div class="glass p-8 max-w-sm w-full mx-4 text-center">
-    <div class="text-2xl text-cyan-300 mb-4">✓</div>
+    <!-- v30: marca de "deu certo" do modal de atualizacao. Este ✓ NAO era
+         estado de serie (aqueles ficaram em texto): era um selo decorativo
+         de 2xl, e glifo grande fica com peso de traco diferente do resto
+         da tela. Vira o simbolo do sprite. -->
+    <div class="text-cyan-300 mb-4"><svg class="icn icn--32" aria-hidden="true" focusable="false"><use href="#icn-confirmar"></use></svg></div>
     <h2 class="text-lg font-bold text-zinc-100 mb-2">FORJA Atualizado</h2>
     <p id="version-text" class="mono text-sm text-zinc-400 mb-4"></p>
     <button onclick="document.getElementById('version-modal').classList.add('hidden')" class="btn btn-success py-2">OK</button>
@@ -3218,9 +4373,10 @@
           </label>
           <select id="evo-select-trainer" class="text-xs"></select>
         </div>
-        <div style="position:relative; height:240px;">
-          <canvas id="evo-chart-trainer"></canvas>
-        </div>
+        <!-- v30.4.0: era <canvas> do Chart.js; agora o proprio app monta o
+             SVG aqui dentro. A altura fixa saiu junto: o SVG tem viewBox e
+             se ajusta sozinho a largura do card. -->
+        <div id="evo-chart-trainer" class="chr-pack"></div>
         <div id="evo-chart-empty-trainer" class="mono text-[10px] text-zinc-600 text-center py-8 hidden">
           Sem dados numericos de carga para este exercicio.
         </div>
@@ -3280,17 +4436,271 @@
     <!-- Objetivo / notas -->
     <div id="aluno-meta" class="mono text-xs text-zinc-500 mb-6"></div>
     <!-- v24: Mapa Muscular (heroi do home) -->
-    <div id="aluno-mapa" class="mb-8"></div>
+    <!-- v30.3.0: o desenho e ESTATICO aqui (SVG de ~17 KB que nunca muda).
+         renderMapaMuscular() so repinta cor de path, lista, chip e painel —
+         nao reescreve este bloco. Ver o changelog do topo. -->
+    <div id="aluno-mapa" class="mb-8">
+      <section class="map-card" aria-labelledby="map-titulo">
+
+        <header class="map-cab">
+          <div>
+            <h3 class="map-h" id="map-titulo">MAPA MUSCULAR</h3>
+            <p class="map-sub">Recuperação por grupo · últ. 7 dias</p>
+          </div>
+          <div class="map-chip">
+            <svg class="map-chip-ic" viewBox="0 0 12 14" aria-hidden="true" focusable="false">
+              <path d="M6 .7 C7.7 3.4 9.9 4.7 10.3 7.7 C10.7 10.8 8.7 13.3 6 13.3 C3.3 13.3 1.3 10.8 1.7 7.7 C1.9 5.6 3 4.4 4.1 2.9 C4.5 4.4 5.1 5.1 5.7 5.5 C5.2 3.8 5.4 2.1 6 .7 Z" fill="#FF7645"/>
+              <path d="M6 6.2 C6.9 7.6 7.8 8.7 7.8 10.1 C7.8 11.4 7 12.2 6 12.2 C5 12.2 4.2 11.4 4.2 10.1 C4.2 8.7 5.1 7.6 6 6.2 Z" fill="#FF8A4C"/>
+            </svg>
+            <span class="map-chip-txt">—</span>
+          </div>
+        </header>
+
+        <div class="map-palco">
+          <!-- dois bonecos num SO svg: cada grupo e UM path com todos os sub-caminhos (esq/dir, frente/costas) -->
+          <svg class="map-svg" viewBox="0 0 264 300" xmlns="http://www.w3.org/2000/svg"
+               xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" focusable="false">
+
+            <defs>
+              <!-- volume da pele: luz no alto-esquerda, sombra embaixo-direita (so tokens) -->
+              <linearGradient id="map-g-pele" x1=".16" y1="0" x2=".92" y2="1">
+                <stop offset="0"   stop-color="#2A3340"/>
+                <stop offset=".46" stop-color="#242C38"/>
+                <stop offset="1"   stop-color="#171E28"/>
+              </linearGradient>
+              <linearGradient id="map-g-piso" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#FF7645" stop-opacity=".16"/>
+                <stop offset="1" stop-color="#FF7645" stop-opacity="0"/>
+              </linearGradient>
+              <radialGradient id="map-g-forja" cx=".5" cy=".44" r=".6">
+                <stop offset="0" stop-color="#973101" stop-opacity=".3"/>
+                <stop offset="1" stop-color="#973101" stop-opacity="0"/>
+              </radialGradient>
+
+              <!-- hachura de "sem registro": distincao por FORMA, nao por cor -->
+              <pattern id="map-hachura" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="7" height="7" fill="#2A3340"/>
+                <rect x="0" y="0" width="2.2" height="7" fill="#6B7686" opacity=".8"/>
+              </pattern>
+
+              <!-- grao de forja: turbulencia estatica, custo pago uma vez -->
+              <filter id="map-grao" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="9" result="map-ruido"/>
+                <feColorMatrix in="map-ruido" type="matrix"
+                  values="0 0 0 0 0.60  0 0 0 0 0.63  0 0 0 0 0.69  0 0 0 0.6 0"/>
+              </filter>
+
+              <!-- silhueta desenhada 1x, instanciada 2x: frente e costas com a mesma anatomia -->
+              <g id="map-silhueta" fill="url(#map-g-pele)" stroke="#323C4B" stroke-width="1" stroke-linejoin="round">
+                <ellipse cx="66" cy="27" rx="12.4" ry="16.6"/>
+                <path d="M58.6 37 L58.6 48 C58.6 52.5 56.6 55 53 57 L79 57 C75.4 55 73.4 52.5 73.4 48 L73.4 37 Z"/>
+                <path d="M66 50 C57 50 50 52 45 56 C38 60 33 67 32 76 C31 87 33 97 35 106 C37 114 39 120 40 128 C40.5 134 40 139 41 144 C43 148.5 47 150.5 52 150.5 L80 150.5 C85 150.5 89 148.5 91 144 C92 139 91.5 134 92 128 C93 120 95 114 97 106 C99 97 101 87 100 76 C99 67 94 60 87 56 C82 52 75 50 66 50 Z"/>
+                <path d="M40 55 C34 57.5 29 64 27.5 73 C26 84 26.5 95 28 105 C29 112 29.5 118 30 124 C30.5 133 31 142 32.5 150 C33.5 156.5 35 162 37.2 165 C40 168.5 45 168 46.8 164.6 C48.4 161.4 47.8 156 46.8 150 C45.8 142 45.3 133 45.3 124 C45.3 116 44.9 108 44.5 100 C44 88 43.6 74 43.1 64 C42.9 58.6 42 55.4 40 55 Z"/>
+                <path d="M92 55 C98 57.5 103 64 104.5 73 C106 84 105.5 95 104 105 C103 112 102.5 118 102 124 C101.5 133 101 142 99.5 150 C98.5 156.5 97 162 94.8 165 C92 168.5 87 168 85.2 164.6 C83.6 161.4 84.2 156 85.2 150 C86.2 142 86.7 133 86.7 124 C86.7 116 87.1 108 87.5 100 C88 88 88.4 74 88.9 64 C89.1 58.6 90 55.4 92 55 Z"/>
+                <path d="M36.6 164.6 C33.4 167.8 32.4 174 34.3 178.8 C36.4 182.8 41.4 183.2 44 179.9 C45.9 176.6 46.3 170.4 45.4 165.2 Z"/>
+                <path d="M95.4 164.6 C98.6 167.8 99.6 174 97.7 178.8 C95.6 182.8 90.6 183.2 88 179.9 C86.1 176.6 85.7 170.4 86.6 165.2 Z"/>
+                <path d="M41.5 145 C37.5 157 36.4 173 38.4 189 C39.8 199 41.2 205 42.6 213 C41.2 227 42.2 241 44 253 C44.9 259 45.3 263.5 44.9 267.5 L59.6 267.5 C60.4 261 60.9 251 61.3 241 C62.2 227 61.8 215 62.2 205 C63.2 189 64.6 171 65.1 151 L65.1 145 Z"/>
+                <path d="M90.5 145 C94.5 157 95.6 173 93.6 189 C92.2 199 90.8 205 89.4 213 C90.8 227 89.8 241 88 253 C87.1 259 86.7 263.5 87.1 267.5 L72.4 267.5 C71.6 261 71.1 251 70.7 241 C69.8 227 70.2 215 69.8 205 C68.8 189 67.4 171 66.9 151 L66.9 145 Z"/>
+                <path d="M44.7 266 L59.8 266 C61.5 269.2 61.1 274.6 56.9 275.7 C52.5 276.8 46.9 276.6 44.9 275.1 C42.9 273.7 43 269.2 44.7 266 Z"/>
+                <path d="M87.3 266 L72.2 266 C70.5 269.2 70.9 274.6 75.1 275.7 C79.5 276.8 85.1 276.6 87.1 275.1 C89.1 273.7 89 269.2 87.3 266 Z"/>
+              </g>
+            </defs>
+
+            <!-- brasa no chao -->
+            <ellipse cx="66"  cy="277" rx="41" ry="6.5" fill="url(#map-g-piso)"/>
+            <ellipse cx="198" cy="277" rx="41" ry="6.5" fill="url(#map-g-piso)"/>
+            <!-- respiro de forja atras dos corpos -->
+            <ellipse cx="66"  cy="140" rx="60" ry="118" fill="url(#map-g-forja)"/>
+            <ellipse cx="198" cy="140" rx="60" ry="118" fill="url(#map-g-forja)"/>
+
+            <!-- corpos -->
+            <g class="map-corpos">
+              <use href="#map-silhueta" xlink:href="#map-silhueta" x="0" y="0"/>
+              <use href="#map-silhueta" xlink:href="#map-silhueta" x="132" y="0"/>
+            </g>
+
+            <!-- grupos musculares: 1 path por grupo, todos os sub-caminhos juntos -->
+            <g class="map-musculos">
+
+              <path class="map-m" id="map-p-trapezio" data-grupo="trapezio" style="--map-c:#E85616"
+                d="M58 47.5 C50.6 48.6 44.4 51.6 39.4 56.4 C45 57.4 51.4 57 57.6 55.4 C58.8 52.8 58.8 49.8 58 47.5 Z
+                   M74 47.5 C81.4 48.6 87.6 51.6 92.6 56.4 C87 57.4 80.6 57 74.4 55.4 C73.2 52.8 73.2 49.8 74 47.5 Z
+                   M198 47 C189 47 180.4 50.6 173 57.6 C168.6 62 167.4 67.4 168.6 72.6 C176.6 73.6 185 76 190 81 C194.2 86.4 196.2 99.6 198 121 C199.8 99.6 201.8 86.4 206 81 C211 76 219.4 73.6 227.4 72.6 C228.6 67.4 227.4 62 223 57.6 C215.6 50.6 207 47 198 47 Z"/>
+
+              <path class="map-m" id="map-p-deltoide-ant" data-grupo="deltoide-ant" style="--map-c:#FF7645"
+                d="M43 54 C36 56.6 30.4 63 28.6 73 C29.6 78.6 34 82.4 39.6 82 C43.4 79 45.4 71 45.4 63 C45.4 58.4 44.6 55.2 43 54 Z
+                   M89 54 C96 56.6 101.6 63 103.4 73 C102.4 78.6 98 82.4 92.4 82 C88.6 79 86.6 71 86.6 63 C86.6 58.4 87.4 55.2 89 54 Z"/>
+
+              <path class="map-m" id="map-p-peito" data-grupo="peito" style="--map-c:#FF7645"
+                d="M64.6 63 C56 62.2 47.4 65 42.4 71.6 C38.8 78.6 41.4 89.2 48.6 92.6 C56.4 94.6 62 89 64.2 82 C65.2 76 65.2 68.6 64.6 63 Z
+                   M67.4 63 C76 62.2 84.6 65 89.6 71.6 C93.2 78.6 90.6 89.2 83.4 92.6 C75.6 94.6 70 89 67.8 82 C66.8 76 66.8 68.6 67.4 63 Z"/>
+
+              <path class="map-m" id="map-p-biceps" data-grupo="biceps" style="--map-c:#C54302"
+                d="M44 84 C36.4 86 30.6 93 30 104 C30.6 113 32.8 120 36 123 C41 123 45 118 45.4 109.4 C45.8 100 45 89.6 44.6 85 Z
+                   M88 84 C95.6 86 101.4 93 102 104 C101.4 113 99.2 120 96 123 C91 123 87 118 86.6 109.4 C86.2 100 87 89.6 87.4 85 Z"/>
+
+              <path class="map-m" id="map-p-abdomen" data-grupo="abdomen" style="--map-c:#E85616"
+                d="M66 95 C59.4 95 54.4 97.2 53.2 102 C51.6 114 52.2 129 54.4 140 C56.6 147.4 61 151 66 151 C71 151 75.4 147.4 77.6 140 C79.8 129 80.4 114 78.8 102 C77.6 97.2 72.6 95 66 95 Z"/>
+
+              <path class="map-m" id="map-p-obliquo" data-grupo="obliquo" style="--map-c:#E85616"
+                d="M52 104 C47.4 109 45.2 118.6 45.8 130 C46.4 140.6 49.4 147.6 54 149.6 C55 139.4 53.8 123.4 53.2 112 Z
+                   M80 104 C84.6 109 86.8 118.6 86.2 130 C85.6 140.6 82.6 147.6 78 149.6 C77 139.4 78.2 123.4 78.8 112 Z"/>
+
+              <path class="map-m" id="map-p-antebraco" data-grupo="antebraco" style="--map-c:#E85616"
+                d="M36.6 126 C33.4 134.6 32.4 145 34.4 155.4 C35.8 162 37.2 166.4 39.4 169 C43.4 168.6 45.6 164.4 46 157 C46.4 145.6 45.6 133.6 44.8 126 Z
+                   M95.4 126 C98.6 134.6 99.6 145 97.6 155.4 C96.2 162 94.8 166.4 92.6 169 C88.6 168.6 86.4 164.4 86 157 C85.6 145.6 86.4 133.6 87.2 126 Z
+                   M168.6 126 C165.4 134.6 164.4 145 166.4 155.4 C167.8 162 169.2 166.4 171.4 169 C175.4 168.6 177.6 164.4 178 157 C178.4 145.6 177.6 133.6 176.8 126 Z
+                   M227.4 126 C230.6 134.6 231.6 145 229.6 155.4 C228.2 162 226.8 166.4 224.6 169 C220.6 168.6 218.4 164.4 218 157 C217.6 145.6 218.4 133.6 219.2 126 Z"/>
+
+              <path class="map-m" id="map-p-quadriceps" data-grupo="quadriceps" style="--map-c:#C54302"
+                d="M64.8 148 C56.4 147 49.4 150.6 46.6 159 C43.8 172.6 44.6 189.4 48.2 201.6 C50.8 208 54.6 209.8 58 207.6 C61.4 203.6 63.4 193.6 64.2 180 C65 166.6 65.2 154 64.8 148 Z
+                   M67.2 148 C75.6 147 82.6 150.6 85.4 159 C88.2 172.6 87.4 189.4 83.8 201.6 C81.2 208 77.4 209.8 74 207.6 C70.6 203.6 68.6 193.6 67.8 180 C67 166.6 66.8 154 67.2 148 Z"/>
+
+              <path class="map-m" id="map-p-panturrilha" data-grupo="panturrilha" style="--map-c:url(#map-hachura)" data-sem="1"
+                d="M45 217 C41.8 226 41.8 240 44.4 251 C46 258 49 260 51 258 C54 253 55.6 242.6 55.6 232 C55.6 224 54.6 219.4 53.6 216.4 Z
+                   M87 217 C90.2 226 90.2 240 87.6 251 C86 258 83 260 81 258 C78 253 76.4 242.6 76.4 232 C76.4 224 77.4 219.4 78.4 216.4 Z
+                   M177 217 C173.8 226 173.8 240 176.4 251 C178 258 181 260 183 258 C186 253 187.6 242.6 187.6 232 C187.6 224 186.6 219.4 185.6 216.4 Z
+                   M219 217 C222.2 226 222.2 240 219.6 251 C218 258 215 260 213 258 C210 253 208.4 242.6 208.4 232 C208.4 224 209.4 219.4 210.4 216.4 Z"/>
+
+              <path class="map-m" id="map-p-deltoide-post" data-grupo="deltoide-post" style="--map-c:#C54302"
+                d="M175 54 C168 56.6 162.4 63 160.6 73 C161.6 78.6 166 82.4 171.6 82 C175.4 79 177.4 71 177.4 63 C177.4 58.4 176.6 55.2 175 54 Z
+                   M221 54 C228 56.6 233.6 63 235.4 73 C234.4 78.6 230 82.4 224.4 82 C220.6 79 218.6 71 218.6 63 C218.6 58.4 219.4 55.2 221 54 Z"/>
+
+              <path class="map-m" id="map-p-costas-sup" data-grupo="costas-sup" style="--map-c:#C54302"
+                d="M184.6 78 C177.6 80.6 173 87.4 174 96.6 C176.2 103.6 181.6 107.6 187.8 106.4 C189.6 100 190 88 188.6 80.4 Z
+                   M211.4 78 C218.4 80.6 223 87.4 222 96.6 C219.8 103.6 214.4 107.6 208.2 106.4 C206.4 100 206 88 207.4 80.4 Z"/>
+
+              <path class="map-m" id="map-p-dorsal" data-grupo="dorsal" style="--map-c:#C54302"
+                d="M190 101 C182.4 103 176 110.6 173.4 121.4 C171.6 133 174.6 145 180.6 152 C186.4 154 190.4 148.6 192.2 138.6 C194 126.6 193 110 190 101 Z
+                   M206 101 C213.6 103 220 110.6 222.6 121.4 C224.4 133 221.4 145 215.4 152 C209.6 154 205.6 148.6 203.8 138.6 C202 126.6 203 110 206 101 Z"/>
+
+              <path class="map-m" id="map-p-triceps" data-grupo="triceps" style="--map-c:#FF7645"
+                d="M176 84 C168.4 86 162.6 93 162 104 C162.6 113 164.8 120 168 123 C173 123 177 118 177.4 109.4 C177.8 100 176.8 89.6 176.4 85 Z
+                   M220 84 C227.6 86 233.4 93 234 104 C233.4 113 231.2 120 228 123 C223 123 219 118 218.6 109.4 C218.2 100 219.2 89.6 219.6 85 Z"/>
+
+              <path class="map-m" id="map-p-lombar" data-grupo="lombar" style="--map-c:#C54302"
+                d="M198 126 C191.4 126 186.6 130.6 184.6 139 C183.4 147.4 185.4 154.6 189.4 158 L206.6 158 C210.6 154.6 212.6 147.4 211.4 139 C209.4 130.6 204.6 126 198 126 Z"/>
+
+              <path class="map-m" id="map-p-gluteo" data-grupo="gluteo" style="--map-c:#C54302"
+                d="M197 152 C189 151 181.4 155 178.6 164 C176.6 175 179.6 186.4 186.6 189.6 C193.4 190.6 197 183.4 197.6 174 C198 165 197.8 156 197 152 Z
+                   M199 152 C207 151 214.6 155 217.4 164 C219.4 175 216.4 186.4 209.4 189.6 C202.6 190.6 199 183.4 198.4 174 C198 165 198.2 156 199 152 Z"/>
+
+              <path class="map-m" id="map-p-posterior" data-grupo="posterior" style="--map-c:#2A3340"
+                d="M194 192 C186.6 191.4 180.6 196 178.4 205 C176.4 215 177.4 225.6 181.2 232 C185.6 234 189.6 229.6 191.4 220.6 C193.2 210 193.6 197.6 194 192 Z
+                   M202 192 C209.4 191.4 215.4 196 217.6 205 C219.6 215 218.6 225.6 214.8 232 C210.4 234 206.4 229.6 204.6 220.6 C202.8 210 202.4 197.6 202 192 Z"/>
+            </g>
+
+            <!-- relevo: sulcos anatomicos (sombra) -->
+            <g class="map-det">
+              <path d="M50 55.5 C56 52.6 76 52.6 82 55.5"/>
+              <path d="M66 66 L66 148"/>
+              <path d="M57.4 96 L74.6 96"/>
+              <path d="M56.4 110 L75.6 110"/>
+              <path d="M56 124 L76 124"/>
+              <path d="M44 74 C51 78.4 58 80.4 63.6 80.6"/>
+              <path d="M88 74 C81 78.4 74 80.4 68.4 80.6"/>
+              <path d="M33.4 66 C36.6 70 40 74 43 76.4"/>
+              <path d="M98.6 66 C95.4 70 92 74 89 76.4"/>
+              <path d="M37.8 94 C39.8 102 40.8 110 40.8 116.6"/>
+              <path d="M94.2 94 C92.2 102 91.2 110 91.2 116.6"/>
+              <path d="M37 132 C36.2 142 36.4 152 37.8 160"/>
+              <path d="M95 132 C95.8 142 95.6 152 94.2 160"/>
+              <path d="M53 158 C50.4 172 51 188 53.4 200"/>
+              <path d="M61 156 C60 172 59 188 58.6 200"/>
+              <path d="M79 158 C81.6 172 81 188 78.6 200"/>
+              <path d="M71 156 C72 172 73 188 73.4 200"/>
+              <path d="M45 210.6 C48.6 214.2 55 214.2 58.4 210.6"/>
+              <path d="M87 210.6 C83.4 214.2 77 214.2 73.6 210.6"/>
+              <path d="M48.6 222 C47.4 234 47.8 246 49 254"/>
+              <path d="M83.4 222 C84.6 234 84.2 246 83 254"/>
+              <path d="M198 50 L198 158"/>
+              <path d="M177 80 C182 88 186 96.4 189 104.6"/>
+              <path d="M219 80 C214 88 210 96.4 207 104.6"/>
+              <path d="M177 116 C183 122.4 188 128.6 191 134.6"/>
+              <path d="M219 116 C213 122.4 208 128.6 205 134.6"/>
+              <path d="M169.6 92 C170.6 100 171 110 170.6 118"/>
+              <path d="M226.4 92 C225.4 100 225 110 225.4 118"/>
+              <path d="M180.6 186.4 C186.4 190.4 192 189.4 196 184.4"/>
+              <path d="M215.4 186.4 C209.6 190.4 204 189.4 200 184.4"/>
+              <path d="M186 200 C185 212 185.6 224 187 232"/>
+              <path d="M210 200 C211 212 210.4 224 209 232"/>
+              <path d="M177 210.6 C180.6 214.2 187 214.2 190.4 210.6"/>
+              <path d="M219 210.6 C215.4 214.2 209 214.2 205.6 210.6"/>
+            </g>
+
+            <!-- relevo: luz de topo-esquerda -->
+            <g class="map-luz">
+              <path d="M43 55.6 C36.6 58.6 31.6 65 30 72.6"/>
+              <path d="M46.2 66 C41.4 70.4 39.6 78 40.8 86"/>
+              <path d="M33.6 89 C31.4 97 31.4 107 32.6 114"/>
+              <path d="M48.4 154 C45.4 166 45 180 46.8 194"/>
+              <path d="M46.8 220 C44.2 228 44 240 45.6 249"/>
+              <path d="M175 55.6 C168.6 58.6 163.6 65 162 72.6"/>
+              <path d="M180.4 82 C176.4 88 175.4 96 177.4 103"/>
+              <path d="M175.6 108 C172.2 118 172.6 130 176 140"/>
+              <path d="M181 160 C178 168 178 180 181 187"/>
+              <path d="M178.8 220 C176.2 228 176 240 177.6 249"/>
+            </g>
+
+            <!-- grao de forja por cima do desenho, abaixo dos rotulos -->
+            <rect class="map-grao" x="0" y="0" width="264" height="284" fill="#0B0E13" filter="url(#map-grao)" opacity=".06"/>
+
+            <text class="map-rot" x="66"  y="294">FRENTE</text>
+            <text class="map-rot" x="198" y="294">COSTAS</text>
+          </svg>
+
+          <div class="map-tip" aria-hidden="true">
+            <div class="map-tip-cab">
+              <span class="map-gauge" data-n="0"><i></i><i></i><i></i></span>
+              <span class="map-tip-nome">—</span>
+              <span class="map-tip-tag">—</span>
+            </div>
+            <div class="map-tip-l"><span>ÚLT. TREINO</span><b class="map-tip-quando">—</b></div>
+            <div class="map-tip-l"><span>EM RECUPER.</span><b class="map-tip-val">—</b></div>
+          </div>
+        </div>
+
+        <div class="map-legenda" aria-hidden="true">
+          <div class="map-leg-cab">
+            <span class="map-leg-lbl">PRONTO</span>
+            <span class="map-leg-lbl">EM BRASA</span>
+          </div>
+          <div class="map-rampa">
+            <div class="map-rampa-cel" data-n="0"><span class="map-gauge" data-n="0"><i></i><i></i><i></i></span><b></b></div>
+            <div class="map-rampa-cel" data-n="1" style="--map-cor:#C54302;--map-c:#C54302"><span class="map-gauge" data-n="1"><i></i><i></i><i></i></span><b></b></div>
+            <div class="map-rampa-cel" data-n="2" style="--map-cor:#E85616;--map-c:#E85616"><span class="map-gauge" data-n="2"><i></i><i></i><i></i></span><b></b></div>
+            <div class="map-rampa-cel" data-n="3" style="--map-cor:#FF7645;--map-c:#FF7645"><span class="map-gauge" data-n="3"><i></i><i></i><i></i></span><b></b></div>
+          </div>
+          <div class="map-rampa-num">
+            <span>0</span><span>1–33</span><span>34–66</span><span>67+</span>
+          </div>
+          <p class="map-leg-sem">
+            <svg class="map-sem-sw" viewBox="0 0 15 15" aria-hidden="true" focusable="false">
+              <rect x="1.2" y="1.2" width="12.6" height="12.6" rx="3" fill="url(#map-hachura)"
+                    stroke="#6B7686" stroke-width="1.2" stroke-dasharray="3 2.6"/>
+            </svg>
+            sem registro no período
+          </p>
+        </div>
+
+        <p class="map-vo">Escala sequencial de recuperação em quatro classes: 0 por cento indica músculo pronto; quanto maior o percentual, mais quente a cor e mais cheio o medidor de três segmentos ao lado do nome. Hachura diagonal com contorno tracejado indica grupo sem registro no período. A lista abaixo repete todos os valores em número e é o alvo de toque de cada grupo.</p>
+
+        <p class="map-cap">Grupos · % em recuperação</p>
+        <div class="map-lista" role="group" aria-label="Grupos musculares e percentual em recuperação"></div>
+
+      </section>
+      <div id="aluno-mapa-painel"></div>
+    </div>
     <!-- Plano -->
     <div id="aluno-plano" class="space-y-3 mb-8"></div>
     <!-- CTAs -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12">
-      <button id="btn-aluno-treinar" class="btn btn-success py-4 text-base sm:col-span-3">▸ TREINAR AGORA</button>
-      <button id="btn-aluno-console" class="btn py-4 sm:col-span-3">▤ CONSOLE (plano, regras e log)</button>
+      <button id="btn-aluno-treinar" class="btn btn-ico btn-success py-4 text-base sm:col-span-3"><svg class="icn icn--20" aria-hidden="true" focusable="false"><use href="#icn-treinar"></use></svg>TREINAR AGORA</button>
+      <button id="btn-aluno-console" class="btn btn-ico py-4 sm:col-span-3"><svg class="icn icn--20" aria-hidden="true" focusable="false"><use href="#icn-ficha"></use></svg>CONSOLE (plano, regras e log)</button>
       <button id="btn-aluno-registrar" class="btn py-4">LANCAR SESSAO</button>
       <button id="btn-aluno-historico" class="btn py-4">EVOLUCAO</button>
-      <button id="btn-aluno-peso" class="btn py-4">⚖ PESO</button>
-      <button id="btn-aluno-cardio" class="btn py-4 sm:col-span-3">🚴 CARDIO (pedal / esteira / remo)</button>
+      <button id="btn-aluno-peso" class="btn btn-ico py-4"><svg class="icn icn--20" aria-hidden="true" focusable="false"><use href="#icn-peso"></use></svg>PESO</button>
+      <button id="btn-aluno-cardio" class="btn btn-ico py-4 sm:col-span-3"><svg class="icn icn--20" aria-hidden="true" focusable="false"><use href="#icn-bike"></use></svg>CARDIO (pedal / esteira / remo)</button>
     </div>
     <!-- Historico / Evolucao (collapse) -->
     <div id="aluno-historico-section" class="hidden glass p-5">
@@ -3306,9 +4716,10 @@
           <div class="mono text-[10px] text-zinc-500 tracking-widest">PROGRESSAO DE CARGA</div>
           <select id="evo-select-aluno" class="text-xs"></select>
         </div>
-        <div style="position:relative; height:220px;">
-          <canvas id="evo-chart-aluno"></canvas>
-        </div>
+        <!-- v30.4.0: era <canvas> do Chart.js; agora o proprio app monta o
+             SVG aqui dentro. A altura fixa saiu junto: o SVG tem viewBox e
+             se ajusta sozinho a largura do card. -->
+        <div id="evo-chart-aluno" class="chr-pack"></div>
         <div id="evo-chart-empty-aluno" class="mono text-[10px] text-zinc-600 text-center py-8 hidden">
           Sem dados numericos de carga para este exercicio.
         </div>
@@ -3449,7 +4860,10 @@
     <!-- v20: descanso ENTRE SERIES — toca DESCANSAR entre uma serie e outra. -/+ ajustam o padrao. -->
     <div class="flex items-center justify-center gap-2 mb-3">
       <button type="button" onclick="ajustarPadraoDescanso(-15)" class="btn px-4 py-3 text-lg">−</button>
-      <button id="btn-treinar-descansar" type="button" onclick="iniciarRest(restSecAtual())" class="btn flex-1 py-3 text-cyan-300 border-cyan-700/50">⏱ DESCANSAR <span id="treinar-rest-label">120s</span></button>
+      <!-- v30: o ⏱ vira icone. Este botao NAO leva .btn-ico de proposito: ele
+           tem um <span> filho (o contador) e virar flex meteria o gap entre o
+           rotulo e o contador. Icone inline + espaco preserva o layout exato. -->
+      <button id="btn-treinar-descansar" type="button" onclick="iniciarRest(restSecAtual())" class="btn flex-1 py-3 text-cyan-300 border-cyan-700/50"><svg class="icn icn--16 icn--mid" aria-hidden="true" focusable="false"><use href="#icn-cronometro"></use></svg> DESCANSAR <span id="treinar-rest-label">120s</span></button>
       <button type="button" onclick="ajustarPadraoDescanso(15)" class="btn px-4 py-3 text-lg">+</button>
     </div>
     <div class="grid grid-cols-2 gap-3">
@@ -4002,7 +5416,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v30.2.0';
+const FORJA_VERSION = 'v30.6.0';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao
@@ -4040,7 +5454,6 @@ const APP = {
   editPlano: emptyPlanoMap(),
   editDay: 'A',
   alunoDay: 'A',
-  evoCharts: { trainer: null, aluno: null },
   savingSession: false, // trava anti-duplo-clique no registro
 
   // OPTIMIZATION (Phase 3A): Registros cache to avoid repeated filters
@@ -4196,17 +5609,64 @@ async function carregarFeedMotivacional() {
 }
 
 function tierDoCardMotivacional(item) {
+  // v30: mesma guarda de partesDoCardMotivacional. As duas rodam na MESMA
+  // linha de renderFeedMotivacional e esta roda PRIMEIRO — guardar so a outra
+  // nao adiantava nada: item nulo estourava aqui antes.
+  item = item || {};
   if (item.campeaoMes) return 'lg';
   if (item.streak >= 3 || item.treinos7d >= 4) return 'md';
   return 'sm';
 }
 
 // Emoji + frase (sem o nome - o nome vai em destaque proprio no card)
+// Icone + frase (sem o nome - o nome vai em destaque proprio no card)
+// v30: o campo continua se chamando 'emoji' de proposito. renderFeedMotivacional
+// injeta ele CRU dentro de <span class="fc-emoji">, e mudar o nome da chave
+// obrigaria a mexer tambem naquele render (que hoje esta correto). O que muda e
+// so o CONTEUDO: em vez de um caractere, markup de <svg><use> do sprite icn-.
+// Injetar sem escapar segue seguro porque o unico valor que entra e id FIXO do
+// proprio codigo - nenhum dado do banco passa por aqui (nome e frase seguem
+// escapados no render, como antes).
+// O TAMANHO nao vem daqui: quem dimensiona e o CSS por tier (.feed-card--md/--lg).
+// A regra de tier ja mora no CSS; repetir no JS seria um segundo lugar pra
+// esquecer de mexer.
+// Guardas: le tudo por 'it' porque o feed e cosmetico e a carga dele e
+// best-effort (vem do cache de localStorage OU da RPC). Atencao: sozinha essa
+// guarda NAO salva de item nulo - tierDoCardMotivacional roda ANTES nesta
+// mesma linha do render e tambem desreferencia item; por isso ele ganhou a
+// mesma guarda (ver substituicoes).
+// treinosMesPassado passa por Number: sem isso um campeao sem esse campo
+// escrevia literalmente "undefined treinos" na tela. Numero valido (inclusive
+// em texto, "12") sai identico ao de antes.
 function partesDoCardMotivacional(item) {
-  if (item.campeaoMes) return { emoji: '🏆', frase: `campeão do mês passado · ${item.treinosMesPassado} treinos` };
-  if (item.streak >= 2) return { emoji: '🔥', frase: `${item.streak} dias seguidos` };
-  if (item.treinos7d >= 3) return { emoji: '💪', frase: `${item.treinos7d} treinos essa semana` };
-  return { emoji: '✅', frase: `treinou ${daysAgo(item.ultimoTreino)}` };
+  const it = item || {};
+  // campeao do mes: medalha em tinta de texto com o miolo em brasa (--icn-hot).
+  // Duas cores so aqui porque este e o unico card grande (30px) - no resto o
+  // desenho e pequeno demais pra dois tons e vira ruido.
+  if (it.campeaoMes) {
+    const n = Number(it.treinosMesPassado);
+    return {
+      emoji: icnSvg('icn-medalha', 'fc-icn--campeao'),
+      frase: `campeão do mês passado · ${Number.isFinite(n) ? n : 0} treinos`
+    };
+  }
+  if (it.streak >= 2) return {
+    emoji: icnSvg('icn-chama', 'fc-icn--streak'),
+    frase: `${it.streak} dias seguidos`
+  };
+  // "musculo" virou o martelo de forja: e o simbolo de TREINAR do app (o mesmo
+  // do CTA "TREINAR AGORA", que nesta v30 tambem passou a usa-lo), e casa com a
+  // marca em vez de importar um biceps.
+  if (it.treinos7d >= 3) return {
+    emoji: icnSvg('icn-treinar', 'fc-icn--semana'),
+    frase: `${it.treinos7d} treinos essa semana`
+  };
+  // daysAgo() ja devolve '—' pra data vazia/corrompida - nunca NaN, nunca
+  // 'undefined'. Mesmo caminho da versao anterior.
+  return {
+    emoji: icnSvg('icn-visto', 'fc-icn--treinou'),
+    frase: `treinou ${daysAgo(it.ultimoTreino)}`
+  };
 }
 
 function renderFeedMotivacional(feed) {
@@ -4384,63 +5844,183 @@ function renderEvoCalendario(regs, containerId) {
   const y = ref.getFullYear(), m = ref.getMonth();
   const mesIso = `${y}-${String(m + 1).padStart(2, '0')}`;
   const diasNoMes = new Date(y, m + 1, 0).getDate();
-  // v29.8.0: dias de FORCA (verde) e dias so de CARDIO (azul) separados.
-  const diaDoMes = r => { const d = dataSessao(r); return (d && d.slice(0, 7) === mesIso) ? parseInt(d.slice(8, 10), 10) : null; };
-  const treinados = new Set((regs || []).filter(r => !ehCardio(r)).map(diaDoMes).filter(Boolean));
-  const cardioDias = new Set((regs || []).filter(ehCardio).map(diaDoMes).filter(Boolean));
+
+  // v30.5.0: alem de SE treinou, guarda O QUE treinou. A letra do dia e o que
+  // faz o mes contar a rotacao ABCD de relance — era o buraco do grid antigo.
+  const diaDoMes = r => {
+    const dd = dataSessao(r);
+    return (dd && dd.slice(0, 7) === mesIso) ? parseInt(dd.slice(8, 10), 10) : null;
+  };
+  const forca = {};    // dia -> { letras:Set, n:contagem de registros }
+  const cardio = {};   // dia -> { tipos:Set, n }
+  (regs || []).forEach(r => {
+    const dd = diaDoMes(r);
+    if (!dd) return;
+    if (ehCardio(r)) {
+      if (!cardio[dd]) cardio[dd] = { tipos: new Set(), n: 0 };
+      cardio[dd].n++;
+      const t = cardioLabel(r.modalidade);
+      if (t) cardio[dd].tipos.add(t);
+    } else {
+      if (!forca[dd]) forca[dd] = { letras: new Set(), n: 0 };
+      forca[dd].n++;
+      const L = String(r.dia || '').toUpperCase();
+      if (DAYS.indexOf(L) >= 0) forca[dd].letras.add(L);
+    }
+  });
+
   const hojeStr = hojeIso();
   const ehMesAtual = hojeStr.slice(0, 7) === mesIso;
   const mesFuturo = mesIso > hojeStr.slice(0, 7);
   const diaHoje = parseInt(hojeStr.slice(8, 10), 10);
-  const primeiroDow = new Date(y, m, 1).getDay(); // 0=domingo
+  const primeiroDow = new Date(y, m, 1).getDay();
+  const DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const GLIFO_CARDIO = '<svg viewBox="0 0 18 10" width="17" height="10" aria-hidden="true"><path d="M1 5h3l1.6-3.4L8.4 9 10.2 5H17"/></svg>';
+  const GLIFO_FALTA = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.6 2.6 9.4 9.4M9.4 2.6 2.6 9.4"/></svg>';
 
-  let faltas = 0;
+  let faltas = 0, nForca = 0, nCardio = 0;
   let cells = '';
-  for (let i = 0; i < primeiroDow; i++) cells += '<div></div>';
-  for (let d = 1; d <= diasNoMes; d++) {
-    const treinou = treinados.has(d);
-    const soCardio = !treinou && cardioDias.has(d); // v29.8.0: dia so de cardio
-    const passado = !mesFuturo && (!ehMesAtual || d < diaHoje);
-    const ehHoje = ehMesAtual && d === diaHoje;
-    let cls, sty = '';
-    if (treinou) {
-      cls = 'bg-emerald-600 text-white';
-    } else if (soCardio) {
-      cls = 'text-white'; sty = 'background:#2563EB;'; // azul = cardio (nao conta falta)
+  for (let i = 0; i < primeiroDow; i++) cells += '<span class="frq-c frq-c--pad" aria-hidden="true"></span>';
+
+  for (let dd = 1; dd <= diasNoMes; dd++) {
+    const f = forca[dd], ca = cardio[dd];
+    const passado = !mesFuturo && (!ehMesAtual || dd < diaHoje);
+    const ehHoje = ehMesAtual && dd === diaHoje;
+    const dow = DOW[new Date(y, m, dd).getDay()];
+    const cab = dow + ', ' + dd + ' ' + MES[m];
+    let cls, glifo, corpo, rot;
+    if (f) {
+      nForca++;
+      const letras = [...f.letras].sort().join('+') || '·';
+      cls = 'frq-c--str';
+      glifo = escapeHtml(letras);
+      corpo = 'Treino ' + letras + ' · ' + f.n + (f.n === 1 ? ' exercicio' : ' exercicios');
+      rot = dd + ' de ' + MES[m] + ', treino de forca ' + letras;
+    } else if (ca) {
+      nCardio++;
+      cls = 'frq-c--car';
+      glifo = GLIFO_CARDIO;
+      corpo = 'Cardio · ' + ([...ca.tipos].join(', ') || ca.n + 'x');
+      rot = dd + ' de ' + MES[m] + ', cardio';
     } else if (passado) {
-      cls = 'cal-falta';
       faltas++;
+      cls = 'frq-c--miss';
+      glifo = GLIFO_FALTA;
+      corpo = 'Sem registro';
+      rot = dd + ' de ' + MES[m] + ', sem treino';
     } else if (ehHoje) {
-      cls = 'text-cyan-300'; sty = 'box-shadow: inset 0 0 0 2px #E85616;';
+      // HOJE sem registro nao e falta (o dia nao acabou) e nao e futuro
+      // ("ainda nao chegou" e mentira sobre o dia que ele esta vivendo).
+      cls = 'frq-c--fut';
+      glifo = '<span class="frq-g--dot"></span>';
+      corpo = 'Hoje · ainda da tempo';
+      rot = dd + ' de ' + MES[m] + ', hoje, sem treino ainda';
     } else {
-      cls = 'text-zinc-700';
+      cls = 'frq-c--fut';
+      glifo = '<span class="frq-g--dot"></span>';
+      corpo = 'Ainda nao chegou';
+      rot = dd + ' de ' + MES[m] + ', futuro';
     }
-    cells += `<div class="mono text-[10px] py-1 text-center rounded-sm ${cls}" style="${sty}">${d}</div>`;
+    if (ehHoje) cls += ' frq-c--today';
+    cells += '<button type="button" class="frq-c ' + cls + '"' +
+      ' data-tip-t="' + escapeHtml(cab) + '" data-tip-b="' + escapeHtml(corpo) + '"' +
+      ' aria-label="' + escapeHtml(rot) + '">' +
+      '<span class="frq-n">' + dd + '</span><span class="frq-g">' + glifo + '</span></button>';
   }
-  const nomeMes = ref.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
-  const corFaltas = faltas > 5 ? 'text-red-400' : (faltas === 5 ? 'text-amber-400' : 'text-emerald-400');
-  const cardioTxt = cardioDias.size ? ` · <span style="color:#60A5FA">${cardioDias.size} cardio</span>` : '';
-  const resumo = mesFuturo ? '' :
-    `<span class="text-emerald-400">${treinados.size} treino${treinados.size === 1 ? '' : 's'}</span>${cardioTxt} · <span class="${corFaltas}">${faltas} falta${faltas === 1 ? '' : 's'}</span> <span class="text-zinc-600">(meta ≤5/mes)</span>`;
-  c.innerHTML = `
-    <div class="glass p-4">
-      <div class="flex items-center justify-between mb-3">
-        <button onclick="calMes('${suffix}', -1)" class="mono text-xs text-zinc-500 hover:text-zinc-100 px-2">◂</button>
-        <div class="mono text-[10px] text-zinc-400 tracking-widest">FREQUENCIA · ${nomeMes}</div>
-        <button onclick="calMes('${suffix}', 1)" class="mono text-xs text-zinc-500 hover:text-zinc-100 px-2">▸</button>
-      </div>
-      <div class="grid grid-cols-7 gap-1 mb-1">
-        ${['D','S','T','Q','Q','S','S'].map(d => `<div class="mono text-[9px] text-zinc-600 text-center">${d}</div>`).join('')}
-      </div>
-      <div class="grid grid-cols-7 gap-1">${cells}</div>
-      <div class="mono text-[10px] mt-3 text-center">${resumo}</div>
-    </div>`;
+
+  const nomeMes = ref.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const corFaltas = faltas > 5 ? 'var(--falta)' : (faltas === 5 ? '#BE7C05' : 'var(--ok-ink)');
+  const sub = mesFuturo ? '&nbsp;' :
+    nForca + ' força' + (nCardio ? ' · ' + nCardio + ' cardio' : '') +
+    '<br><span style="color:' + corFaltas + '">' + faltas + (faltas === 1 ? ' falta' : ' faltas') + '</span>' +
+    ' <span style="color:var(--text-faint)">(meta ≤5)</span>';
+
+  c.innerHTML =
+    '<section class="frq-pack">' +
+      '<article class="frq-card">' +
+        '<div class="frq-head">' +
+          '<div style="display:flex;align-items:center;gap:2px">' +
+            '<button type="button" class="frq-nav" onclick="calMes(\'' + suffix + '\', -1)" aria-label="Mês anterior">◂</button>' +
+            '<div><p class="frq-kick">Mapa do mês</p>' +
+            '<h3 class="frq-title">' + escapeHtml(nomeMes) + '</h3></div>' +
+            '<button type="button" class="frq-nav" onclick="calMes(\'' + suffix + '\', 1)" aria-label="Próximo mês">▸</button>' +
+          '</div>' +
+          '<p class="frq-sub">' + sub + '</p>' +
+        '</div>' +
+        '<div class="frq-dow" aria-hidden="true"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>' +
+        '<div class="frq-cal" aria-label="Calendário de treinos">' + cells + '</div>' +
+        '<div class="frq-tip" role="tooltip" aria-hidden="true"><span class="frq-tip-t"></span><span class="frq-tip-b"></span></div>' +
+      '</article>' +
+    '</section>';
+  frqLigarTip(c);
 }
 
-// ---------- API ----------
+// v30.5.0: tooltip da peca `frequencia`. O original era um IIFE que casava
+// .frq-pack na carga; aqui vira funcao, porque o calendario e redesenhado a
+// cada troca de mes e de periodo. A guarda data-frq-ready impede empilhar
+// listener no MESMO pack — e o pack novo de cada render comeca sem ela.
+function frqLigarTip(raiz) {
+  const pack = raiz.querySelector('.frq-pack');
+  if (!pack || pack.getAttribute('data-frq-ready') === '1') return;
+  const tip = pack.querySelector('.frq-tip');
+  if (!tip) return;
+  pack.setAttribute('data-frq-ready', '1');
+  const tipT = tip.querySelector('.frq-tip-t');
+  const tipB = tip.querySelector('.frq-tip-b');
+  let cur = null, lock = false;
 
-// v29.5.0: 15s (era 25s na era Apps Script — o Supabase nao tem cold start
-// de minutos; 15s ainda cobre 3G ruim de academia com folga).
+  const alvo = e => (e.target && e.target.closest) ? e.target.closest('[data-tip-t]') : null;
+  const monta = el => {
+    tipT.textContent = el.getAttribute('data-tip-t') || '';
+    tipB.textContent = '';
+    (el.getAttribute('data-tip-b') || '').split('|').forEach(l => {
+      if (!l) return;
+      const sp = document.createElement('span');
+      sp.className = 'frq-tip-l';
+      sp.textContent = l;
+      tipB.appendChild(sp);
+    });
+  };
+  const posiciona = el => {
+    const pr = pack.getBoundingClientRect(), er = el.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = (er.left - pr.left) + er.width / 2 - tw / 2;
+    x = Math.max(6, Math.min(x, pr.width - tw - 6));
+    let yy = (er.top - pr.top) - th - 8;
+    if (yy < 2) yy = (er.bottom - pr.top) + 8;
+    tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(yy) + 'px)';
+  };
+  const abre = el => { if (!el) return; cur = el; monta(el); tip.classList.add('frq-tip--on'); posiciona(el); };
+  const fecha = () => { cur = null; lock = false; tip.classList.remove('frq-tip--on'); };
+
+  pack.addEventListener('pointerover', e => {
+    if (lock || e.pointerType === 'touch') return;
+    const el = alvo(e);
+    if (el && el !== cur) abre(el);
+  });
+  pack.addEventListener('pointerout', e => {
+    if (lock || e.pointerType === 'touch') return;
+    const el = alvo(e);
+    if (!el) return;
+    const para = e.relatedTarget;
+    if (para && para.closest && para.closest('[data-tip-t]') === el) return;
+    fecha();
+  });
+  pack.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    const el = alvo(e);
+    if (!el) { fecha(); return; }
+    if (el === cur) { fecha(); return; }
+    lock = true; abre(el);
+  });
+  pack.addEventListener('focusin', e => { const el = alvo(e); if (el) abre(el); });
+  pack.addEventListener('focusout', () => { if (!lock) fecha(); });
+  pack.addEventListener('keydown', e => { if (e.key === 'Escape') fecha(); });
+  document.addEventListener('pointerdown', e => { if (!pack.contains(e.target)) fecha(); }, true);
+  window.addEventListener('resize', fecha);
+}
+
 const API_TIMEOUT_MS = 15000;
 
 // Erro de rede/servidor com uma flag `network` para o chamador distinguir
@@ -4509,36 +6089,18 @@ async function apiPost(body) {
   return sbRpc('api_post', body);
 }
 
-// ---------- CHART.JS SOB DEMANDA (v29.4.0) ----------
+// ---------- (v30.4.0) O CHART.JS SAIU ----------
+// Ficava aqui o carregador sob demanda: CHARTJS_URL, ensureChartJs e
+// _chartJsPromise. O grafico agora e SVG montado pelo proprio app
+// (evoSvgUnico / evoSvgComparar), entao nao ha lib externa, nao ha CDN e nao
+// ha o estado "grafico indisponivel offline". A entrada do cdnjs tambem saiu
+// do ASSETS do sw.js — se voltar a precisar, os dois lugares mudam juntos.
+// ---------- fim do bloco que existia aqui ----------
 // A lib saiu do <head> (bloqueava o first paint com ~70KB gzip) e so e
 // carregada quando a EVOLUCAO precisa desenhar. A URL PRECISA bater com a
 // entrada em ASSETS do sw.js: e o precache do SW que faz este load
 // on-demand ser instantaneo e funcionar offline. Ao atualizar a versao do
 // Chart.js, mudar NOS DOIS lugares.
-const CHARTJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-
-let _chartJsPromise = null;
-function ensureChartJs() {
-  if (window.Chart) return Promise.resolve();
-  if (_chartJsPromise) return _chartJsPromise;
-  _chartJsPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = CHARTJS_URL;
-    // onload valida window.Chart: um SW antigo (pre-v29.4.0) offline podia
-    // responder HTML com status 200 no lugar do script - onerror nao
-    // dispararia e o script "carregaria" com syntax error silencioso.
-    s.onload = () => (window.Chart ? resolve() : reject(new Error('Chart.js carregou invalido')));
-    s.onerror = () => reject(new Error('Falha ao carregar Chart.js'));
-    document.head.appendChild(s);
-  }).catch(err => {
-    // Reset: falha offline nao pode envenenar a feature ate o reload -
-    // voltar online e reabrir a EVOLUCAO tenta de novo.
-    _chartJsPromise = null;
-    throw err;
-  });
-  return _chartJsPromise;
-}
-
 // ---------- CACHE LOCAL DE DADOS (v29.3.0) ----------
 // Objetivo: nao bloquear a UI num round-trip do Apps Script quando ja temos
 // dado bom o suficiente pra pintar a tela.
@@ -5202,7 +6764,7 @@ function renderPlanoTable() {
       <td><input type="text" data-i="${i}" data-f="meta" value="${escapeHtml(ex.meta != null ? ex.meta : '')}" placeholder="kg" /></td>
       <td><input type="text" data-i="${i}" data-f="obs" value="${escapeHtml(ex.obs || '')}" /></td>
       <td class="text-center whitespace-nowrap">
-        <button data-act="lancar" data-i="${i}" title="Lancar execucao deste exercicio" class="text-zinc-500 hover:text-emerald-400 px-1">⚡</button>
+        <button data-act="lancar" data-i="${i}" title="Lancar execucao deste exercicio" aria-label="Lancar execucao deste exercicio" class="text-zinc-500 hover:text-emerald-400 px-1"><svg class="icn icn--16 icn--mid" aria-hidden="true" focusable="false"><use href="#icn-lancar"></use></svg></button>
         <button data-act="up" data-i="${i}" class="text-zinc-500 hover:text-cyan-400 px-1">▲</button>
         <button data-act="down" data-i="${i}" class="text-zinc-500 hover:text-cyan-400 px-1">▼</button>
         <button data-act="del" data-i="${i}" class="text-zinc-500 hover:text-red-500 px-1">✕</button>
@@ -5463,9 +7025,8 @@ function _renderEvo(suffix) {
   setupEvoChart(forca, suffix);
 }
 function renderEvolucao(regs, suffix, isTrainer) {
-  // v29.4.0: warm-up do Chart.js em paralelo com stats/calendario/historico
-  // (fire-and-forget; se falhar, drawEvoChart trata na hora de desenhar).
-  ensureChartJs().catch(() => {});
+  // v30.4.0: o warm-up do Chart.js saiu junto com a lib. Nao ha mais nada pra
+  // pre-carregar — o grafico e montado na hora, sem rede.
   APP.evoFull[suffix] = { regs: regs || [], isTrainer };
   if (!APP.evoPeriodo[suffix]) APP.evoPeriodo[suffix] = 'tudo';
   _renderEvo(suffix);
@@ -5564,166 +7125,506 @@ function setupEvoChart(regs, suffix) {
   drawEvoChart(regs, suffix);
 }
 
+// ===========================================================================
+// v30.4.0: GRAFICO DE PROGRESSAO EM SVG (peca `progressao`, prefixo chr-)
+// ---------------------------------------------------------------------------
+// Substitui o Chart.js. O ganho nao e so visual: mata a dependencia de CDN e,
+// com ela, o modo de falha "Grafico indisponivel offline. Conecte-se uma vez
+// para baixa-lo" — que aparecia justamente em quem instalou o PWA e abriu no
+// vestiario sem sinal.
+//
+// A peca aprovada tem geometria PRE-CALCULADA no markup pra exatamente 21
+// pontos. Aqui ela virou gerador: mesmo desenho, numero de sessoes livre.
+//
+// GEOMETRIA (copiada da peca, nao reinventada): viewBox 358x256.
+//   painel 1 (carga)  y 32..152    trilho x 26..308, serie x 32..302
+//   divisor           y 166
+//   painel 2 (volume) y 184..236   barras crescem de baixo pra cima
+//   calha da direita  x 310..358   (rotulo grande do ultimo valor)
+//
+// REGRA DE OURO DESTE ARQUIVO: um NaN dentro de um atributo "d" apaga o
+// desenho INTEIRO, sem erro no console. Toda coordenada passa por num() antes
+// de virar string.
+// ===========================================================================
+
+var CHR = {
+  VB_W: 358, VB_H: 256,
+  X0: 32, X1: 302,          // primeiro e ultimo ponto da serie
+  GX0: 26, GX1: 308,        // trilho/grade
+  Y_TOPO: 40, Y_BASE: 140,  // faixa util do painel de carga
+  Y_AREA: 152,              // base da area preenchida
+  DIV: 166,
+  V_TOPO: 184, V_BASE: 236, // painel de volume
+};
+
+// numero seguro pra atributo SVG: qualquer coisa nao-finita vira null e quem
+// chama decide (pular o ponto, esconder o painel). Nunca deixa NaN passar.
+function chrNum(v) {
+  var n = Number(v);
+  return isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+function chrBr(n, casas) {
+  if (n == null || !isFinite(n)) return '—';
+  return n.toFixed(casas == null ? 1 : casas).replace('.', ',').replace(/,0+$/, '');
+}
+
+// escala "bonita": 4 linhas de grade em passo redondo cobrindo [min,max].
+function chrEscala(min, max) {
+  if (!isFinite(min) || !isFinite(max)) return null;
+  if (min === max) { min -= 1; max += 1; }          // serie plana: nao divide por zero
+  var bruto = (max - min) / 3;
+  var mag = Math.pow(10, Math.floor(Math.log(bruto) / Math.LN10));
+  var passo = mag;
+  [1, 2, 2.5, 5, 10].some(function (m) {
+    if (mag * m >= bruto) { passo = mag * m; return true; }
+    return false;
+  });
+  var lo = Math.floor(min / passo) * passo;
+  var hi = lo + passo * 3;
+  while (hi < max) { hi += passo; }
+  var ticks = [];
+  for (var v = lo; v <= hi + 1e-9; v += passo) ticks.push(Math.round(v * 1000) / 1000);
+  return { lo: lo, hi: hi, ticks: ticks };
+}
+
+// ---------------------------------------------------------------------------
+// PONTOS: de registros brutos pro que o desenho precisa.
+// vol = carga x soma das reps DAS SERIES ANOTADAS (a lista "15/15/15" que ele
+// escreve na obs). Quando a obs nao traz a lista, vol fica null e a barra
+// simplesmente NAO e desenhada — o trilho hachurado aparece no lugar. Inventar
+// series (multiplicar por 3 "porque geralmente sao 3") encheria o grafico de
+// numero falso, e volume falso e pior que volume ausente.
+// ---------------------------------------------------------------------------
+function evoPontosDe(regs, grupoEx) {
+  var pts = regs
+    .filter(function (r) { return grupoEx.has(slugify(r.exercicio)); })
+    .map(function (r) {
+      var carga = parseCargaNum(r.carga);
+      if (carga == null) return null;
+      var lista = repsDaObsDoRegistro(r.obs);
+      var totalReps = null;
+      if (lista && lista.length) {
+        totalReps = lista.reduce(function (a, b) { return a + b; }, 0);
+      }
+      return {
+        iso: dataSessao(r),
+        carga: carga,
+        reps: valorRegistroLimpo(r.reps),
+        rir: valorRegistroLimpo(r.rir),
+        vol: totalReps != null ? carga * totalReps : null,
+        series: lista ? lista.length : null,
+        dl: /deload/i.test(String(r.obs || '')),
+      };
+    })
+    .filter(function (p) { return p && p.iso; })
+    .sort(function (a, b) { return String(a.iso).localeCompare(String(b.iso)); });
+
+  // PR = carga acima de tudo que veio antes (o primeiro ponto nao e PR: nao ha
+  // "antes" pra superar, marcar ele como recorde seria ruido).
+  var rec = -Infinity;
+  pts.forEach(function (p, i) {
+    p.pr = (i > 0 && p.carga > rec);
+    if (p.carga > rec) rec = p.carga;
+  });
+  return pts;
+}
+
+function chrX(i, n) {
+  if (n <= 1) return (CHR.X0 + CHR.X1) / 2;
+  return CHR.X0 + (CHR.X1 - CHR.X0) * (i / (n - 1));
+}
+
+// ---------------------------------------------------------------------------
+// SVG do modo NORMAL (uma serie) — o desenho da peca.
+// sufixo entra em TODO id: a EVOLUCAO e instanciada DUAS vezes na mesma pagina
+// (aluno e trainer). Sem isso, url(#chr-gArea) do segundo grafico resolveria
+// pro <defs> do primeiro, e clip-path/gradiente pintariam errado.
+// ---------------------------------------------------------------------------
+function evoSvgUnico(pts, suffix, alvoNum, nomeEx) {
+  var n = pts.length;
+  var id = function (k) { return 'chr-' + k + '-' + suffix; };
+  var cargas = pts.map(function (p) { return p.carga; });
+  var esc = chrEscala(Math.min.apply(null, cargas), Math.max.apply(null, cargas));
+  if (!esc) return '';
+  var yDe = function (v) {
+    var t = (v - esc.lo) / (esc.hi - esc.lo);
+    return chrNum(CHR.Y_BASE - t * (CHR.Y_BASE - CHR.Y_TOPO));
+  };
+
+  // --- pontos com coordenada ---
+  var co = [];
+  for (var i = 0; i < n; i++) {
+    var x = chrNum(chrX(i, n)), y = yDe(pts[i].carga);
+    if (x == null || y == null) return '';   // nao desenha meio-torto
+    co.push({ x: x, y: y, p: pts[i] });
+  }
+
+  var linha = co.map(function (c, k) { return (k ? 'L' : 'M') + c.x + ' ' + c.y; }).join('');
+  var area = linha + 'L' + co[n - 1].x + ' ' + CHR.Y_AREA + 'L' + co[0].x + ' ' + CHR.Y_AREA + 'Z';
+
+  // --- grade + eixo Y ---
+  var grade = '', eixo = '';
+  esc.ticks.forEach(function (t) {
+    var y = yDe(t);
+    if (y == null) return;
+    grade += '<line x1="' + CHR.GX0 + '" y1="' + y + '" x2="' + CHR.GX1 + '" y2="' + y + '"/>';
+    eixo += '<text x="22" y="' + chrNum(y + 3.5) + '">' + escapeHtml(chrBr(t, 1)) + '</text>';
+  });
+
+  // --- linha de ALVO (meta do plano) ---
+  var alvo = '';
+  if (alvoNum != null && alvoNum >= esc.lo && alvoNum <= esc.hi) {
+    var ya = yDe(alvoNum);
+    if (ya != null) {
+      alvo = '<line class="chr-alvo" x1="' + CHR.GX0 + '" y1="' + ya + '" x2="' + CHR.GX1 + '" y2="' + ya + '"/>' +
+             '<text class="chr-axSm chr-alvoTx" x="' + CHR.GX1 + '" y="' + chrNum(ya - 4) + '" text-anchor="end">ALVO ' +
+             escapeHtml(chrBr(alvoNum, 1)) + 'KG</text>';
+    }
+  }
+
+  // --- marcadores: PR (losango) e deload (anel com barra). FORMA, nao so cor. ---
+  var prs = '', dls = '';
+  co.forEach(function (c) {
+    if (c.p.pr) prs += '<path d="M' + c.x + ' ' + chrNum(c.y - 5) + 'L' + chrNum(c.x + 5) + ' ' + c.y +
+                       'L' + c.x + ' ' + chrNum(c.y + 5) + 'L' + chrNum(c.x - 5) + ' ' + c.y + 'Z"/>';
+    if (c.p.dl) dls += '<circle cx="' + c.x + '" cy="' + c.y + '" r="5"/><line x1="' + chrNum(c.x - 2.6) +
+                       '" y1="' + c.y + '" x2="' + chrNum(c.x + 2.6) + '" y2="' + c.y + '"/>';
+  });
+
+  // --- painel 2: volume ---
+  var vols = co.filter(function (c) { return c.p.vol != null; });
+  var volSvg = '';
+  if (vols.length) {
+    var vmax = Math.max.apply(null, vols.map(function (c) { return c.p.vol; }));
+    var vmed = vols.reduce(function (a, c) { return a + c.p.vol; }, 0) / vols.length;
+    var alt = CHR.V_BASE - CHR.V_TOPO;
+    var larg = n > 1 ? Math.max(3, Math.min(11.5, (CHR.X1 - CHR.X0) / n * 0.72)) : 11.5;
+    var barras = '';
+    vols.forEach(function (c) {
+      var h = chrNum(Math.max(2, (c.p.vol / vmax) * alt));
+      if (h == null) return;
+      barras += '<rect class="chr-bar" x="' + chrNum(c.x - larg / 2) + '" y="' + chrNum(CHR.V_BASE - h) +
+                '" width="' + chrNum(larg) + '" height="' + h + '" rx="3"/>';
+    });
+    var ym = chrNum(CHR.V_BASE - (vmed / vmax) * alt);
+    volSvg =
+      '<line class="chr-div" x1="' + CHR.GX0 + '" y1="' + CHR.DIV + '" x2="' + CHR.GX1 + '" y2="' + CHR.DIV + '" shape-rendering="crispEdges"/>' +
+      '<text class="chr-unit" x="' + CHR.GX0 + '" y="180">VOLUME · CARGA × REPS ANOTADAS</text>' +
+      '<text class="chr-ax" x="' + CHR.GX1 + '" y="180" text-anchor="end">máx ' + escapeHtml(chrBr(vmax, 0)) + '</text>' +
+      '<rect class="chr-rail" x="' + CHR.GX0 + '" y="' + CHR.V_TOPO + '" width="' + (CHR.GX1 - CHR.GX0) +
+      '" height="' + (CHR.V_BASE - CHR.V_TOPO) + '" fill="url(#' + id('pRail') + ')"/>' +
+      '<g clip-path="url(#' + id('clipBars') + ')">' + barras + '</g>' +
+      (ym != null ? '<line class="chr-mean" x1="' + CHR.GX0 + '" y1="' + ym + '" x2="' + CHR.GX1 + '" y2="' + ym + '"/>' +
+        '<text class="chr-axSm" x="310" y="' + chrNum(ym + 3.5) + '">MÉD ' + escapeHtml(chrBr(vmed, 0)) + '</text>' : '') +
+      '<line class="chr-base" x1="' + CHR.GX0 + '" y1="' + CHR.V_BASE + '" x2="' + CHR.GX1 + '" y2="' + CHR.V_BASE + '" shape-rendering="crispEdges"/>';
+  } else {
+    volSvg =
+      '<line class="chr-div" x1="' + CHR.GX0 + '" y1="' + CHR.DIV + '" x2="' + CHR.GX1 + '" y2="' + CHR.DIV + '" shape-rendering="crispEdges"/>' +
+      '<text class="chr-unit" x="' + CHR.GX0 + '" y="180">VOLUME</text>' +
+      '<text class="chr-axSm" x="' + CHR.GX0 + '" y="205">sem reps por serie anotadas na obs</text>' +
+      '<text class="chr-axSm" x="' + CHR.GX0 + '" y="219">(escreva "15/15/15" na OBS pra ver o volume)</text>';
+  }
+
+  var ult = co[n - 1];
+  var prim = co[0];
+  var descr = nomeEx + ': ' + chrBr(prim.p.carga, 1) + ' kg em ' + fmtDate(prim.p.iso) +
+              ' até ' + chrBr(ult.p.carga, 1) + ' kg em ' + fmtDate(ult.p.iso) +
+              ', ' + n + ' sessões.';
+
+  return '' +
+  '<svg class="chr-svg" viewBox="0 0 ' + CHR.VB_W + ' ' + CHR.VB_H + '" role="img" aria-label="' + escapeHtml(descr) + '">' +
+    '<defs>' +
+      '<linearGradient id="' + id('gArea') + '" gradientUnits="userSpaceOnUse" x1="0" y1="' + CHR.Y_TOPO + '" x2="0" y2="' + CHR.Y_AREA + '">' +
+        '<stop offset="0" stop-color="#E85616" stop-opacity=".38"/>' +
+        '<stop offset=".45" stop-color="#E85616" stop-opacity=".15"/>' +
+        '<stop offset="1" stop-color="#E85616" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="' + id('gVol') + '" gradientUnits="userSpaceOnUse" x1="0" y1="' + CHR.V_BASE + '" x2="0" y2="' + CHR.V_TOPO + '">' +
+        '<stop offset="0" stop-color="#C54302"/><stop offset=".6" stop-color="#E85616"/>' +
+        '<stop offset="1" stop-color="#FF7645"/></linearGradient>' +
+      '<radialGradient id="' + id('gEmber') + '" gradientUnits="userSpaceOnUse" cx="' + ult.x + '" cy="' + ult.y + '" r="46">' +
+        '<stop offset="0" stop-color="#FF8A4C" stop-opacity=".20"/>' +
+        '<stop offset=".55" stop-color="#FF8A4C" stop-opacity=".06"/>' +
+        '<stop offset="1" stop-color="#FF8A4C" stop-opacity="0"/></radialGradient>' +
+      '<filter id="' + id('fGlow') + '" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation="2.2"/></filter>' +
+      '<pattern id="' + id('pRail') + '" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        '<line class="chr-railL" x1="0" y1="0" x2="0" y2="8"/></pattern>' +
+      '<clipPath id="' + id('clipBars') + '"><rect x="' + CHR.GX0 + '" y="' + CHR.V_TOPO + '" width="' + (CHR.GX1 - CHR.GX0) + '" height="' + (CHR.V_BASE - CHR.V_TOPO) + '"/></clipPath>' +
+    '</defs>' +
+    '<circle class="chr-ember" cx="' + ult.x + '" cy="' + ult.y + '" r="46" fill="url(#' + id('gEmber') + ')"/>' +
+    '<g class="chr-grid" shape-rendering="crispEdges">' + grade + '</g>' +
+    '<text class="chr-unit" x="22" y="22" text-anchor="end">KG</text>' +
+    '<g class="chr-ax chr-axY">' + eixo + '</g>' +
+    alvo +
+    '<path class="chr-area" d="' + area + '" fill="url(#' + id('gArea') + ')"/>' +
+    '<path class="chr-lineGlow" d="' + linha + '" filter="url(#' + id('fGlow') + ')"/>' +
+    '<path class="chr-line" d="' + linha + '"/>' +
+    '<circle class="chr-start" cx="' + prim.x + '" cy="' + prim.y + '" r="3.4"/>' +
+    (n > 1 ? '<text class="chr-note" x="' + chrNum(prim.x + 6) + '" y="' + chrNum(prim.y + 14) + '">' + escapeHtml(chrBr(prim.p.carga, 1)) + ' kg</text>' : '') +
+    '<g class="chr-dl" aria-hidden="true">' + dls + '</g>' +
+    '<g class="chr-pr" aria-hidden="true">' + prs + '</g>' +
+    '<circle class="chr-last" cx="' + ult.x + '" cy="' + ult.y + '" r="4.6"/>' +
+    '<text class="chr-big" x="310" y="' + chrNum(Math.max(20, Math.min(140, ult.y - 2))) + '">' + escapeHtml(chrBr(ult.p.carga, 1)) + '</text>' +
+    '<text class="chr-unit" x="310" y="' + chrNum(Math.max(31, Math.min(151, ult.y + 9))) + '">KG</text>' +
+    volSvg +
+    '<g class="chr-cross"><line class="chr-crossLine" x1="0" y1="' + CHR.Y_TOPO + '" x2="0" y2="' + CHR.V_BASE + '"/>' +
+      '<circle class="chr-focus" cx="-99" cy="-99" r="5.5"/></g>' +
+  '</svg>';
+}
+
+// ---------------------------------------------------------------------------
+// SVG do modo COMPARAR ALUNOS (trainer). O desenho da peca e de UMA serie:
+// area preenchida, marcador de PR, barra de volume e rotulo grande do ultimo
+// valor sao todos afirmacoes sobre um unico historico. Com 4 alunos
+// sobrepostos, area vira sujeira e "o PR" nao quer dizer nada.
+// Entao aqui e um modo proprio: so linhas, paleta categorica validada, legenda
+// com o nome de cada um. Menos desenho, mesma pergunta respondida.
+// ---------------------------------------------------------------------------
+function evoSvgComparar(series, suffix) {
+  var todas = series.reduce(function (a, s) { return a.concat(s.pts.map(function (p) { return p.carga; })); }, []);
+  if (!todas.length) return '';
+  var esc = chrEscala(Math.min.apply(null, todas), Math.max.apply(null, todas));
+  if (!esc) return '';
+  var datas = [];
+  series.forEach(function (s) { s.pts.forEach(function (p) { if (datas.indexOf(p.iso) < 0) datas.push(p.iso); }); });
+  datas.sort();
+  var n = datas.length;
+  var yDe = function (v) {
+    var t = (v - esc.lo) / (esc.hi - esc.lo);
+    return chrNum(CHR.Y_BASE - t * (CHR.Y_BASE - CHR.Y_TOPO));
+  };
+  var PALETA = ['#E85616', '#0598CE', '#09A66B', '#BE7C05', '#9276E2', '#EB4D45'];
+  var grade = '', eixo = '';
+  esc.ticks.forEach(function (t) {
+    var y = yDe(t);
+    if (y == null) return;
+    grade += '<line x1="' + CHR.GX0 + '" y1="' + y + '" x2="' + CHR.GX1 + '" y2="' + y + '"/>';
+    eixo += '<text x="22" y="' + chrNum(y + 3.5) + '">' + escapeHtml(chrBr(t, 1)) + '</text>';
+  });
+  var linhas = '', leg = '';
+  series.forEach(function (s, si) {
+    var cor = PALETA[si % PALETA.length];
+    var mapa = {};
+    s.pts.forEach(function (p) { mapa[p.iso] = p.carga; });
+    var d = '', primeiro = true;
+    datas.forEach(function (iso, i) {
+      if (mapa[iso] == null) return;
+      var x = chrNum(chrX(i, n)), y = yDe(mapa[iso]);
+      if (x == null || y == null) return;
+      d += (primeiro ? 'M' : 'L') + x + ' ' + y;
+      primeiro = false;
+    });
+    if (!d) return;
+    // tracejado por serie: sob deuteranopia duas cores da paleta podem se
+    // aproximar, entao o padrao do traco carrega a identidade junto.
+    var dash = si === 0 ? '' : ' stroke-dasharray="' + (2 + si * 2) + ' ' + (2 + si) + '"';
+    linhas += '<path class="chr-lineCmp" d="' + d + '" stroke="' + cor + '"' + dash + '/>';
+    var lx = 28 + (si % 3) * 108, ly = 246 + Math.floor(si / 3) * 12;
+    leg += '<rect x="' + lx + '" y="' + (ly - 6) + '" width="16" height="2.5" fill="' + cor + '"' + dash + '/>' +
+           '<text class="chr-axSm" x="' + (lx + 21) + '" y="' + (ly - 2) + '">' + escapeHtml(String(s.nome).slice(0, 14)) + '</text>';
+  });
+  return '<svg class="chr-svg" viewBox="0 0 358 262" role="img" aria-label="Comparacao de carga entre alunos">' +
+    '<g class="chr-grid" shape-rendering="crispEdges">' + grade + '</g>' +
+    '<text class="chr-unit" x="22" y="22" text-anchor="end">KG</text>' +
+    '<g class="chr-ax chr-axY">' + eixo + '</g>' + linhas +
+    '<line class="chr-base" x1="' + CHR.GX0 + '" y1="' + CHR.Y_BASE + '" x2="' + CHR.GX1 + '" y2="' + CHR.Y_BASE + '" shape-rendering="crispEdges"/>' +
+    leg + '</svg>';
+}
+
+
+// ---------------------------------------------------------------------------
+// v30.4.0: interacao do grafico (crosshair + tooltip). Ponteiro, toque e
+// teclado. Delegada no container e ligada UMA vez por sufixo — o render
+// substitui o innerHTML, entao listener preso no SVG morreria a cada redraw.
+// ---------------------------------------------------------------------------
+const EVO_SCRUB = {};
+
+function evoLigarScrub(suffix) {
+  if (EVO_SCRUB[suffix]) return;
+  const wrap = $('evo-chart-' + suffix);
+  if (!wrap) return;
+  EVO_SCRUB[suffix] = { pts: [], vbw: CHR.VB_W, atual: -1 };
+
+  const perto = (clientX) => {
+    const st = EVO_SCRUB[suffix];
+    const svg = wrap.querySelector('.chr-svg');
+    if (!svg || !st.pts.length) return;
+    const r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    const vx = (clientX - r.left) / r.width * st.vbw;
+    let melhor = 0, dist = Infinity;
+    st.pts.forEach((p, i) => {
+      const dd = Math.abs(p.x - vx);
+      if (dd < dist) { dist = dd; melhor = i; }
+    });
+    if (melhor !== st.atual) evoMostrarPonto(suffix, melhor, false);
+  };
+
+  wrap.addEventListener('pointerdown', ev => perto(ev.clientX));
+  wrap.addEventListener('pointermove', ev => perto(ev.clientX));
+  wrap.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') evoEsconderPonto(suffix); });
+  wrap.addEventListener('pointercancel', () => evoEsconderPonto(suffix));
+  wrap.addEventListener('keydown', ev => {
+    const st = EVO_SCRUB[suffix];
+    if (!st.pts.length) return;
+    let n = st.atual < 0 ? st.pts.length - 1 : st.atual;
+    if (ev.key === 'ArrowRight') n = Math.min(st.pts.length - 1, n + 1);
+    else if (ev.key === 'ArrowLeft') n = Math.max(0, n - 1);
+    else if (ev.key === 'Home') n = 0;
+    else if (ev.key === 'End') n = st.pts.length - 1;
+    else if (ev.key === 'Escape') { evoEsconderPonto(suffix); return; }
+    else return;
+    ev.preventDefault();
+    evoMostrarPonto(suffix, n, true);
+  });
+  wrap.addEventListener('blur', () => evoEsconderPonto(suffix));
+  // no toque a leitura fica na tela ate tocar fora
+  document.addEventListener('pointerdown', ev => {
+    if (!wrap.contains(ev.target)) evoEsconderPonto(suffix);
+  }, true);
+}
+
+function evoMostrarPonto(suffix, k, teclado) {
+  const st = EVO_SCRUB[suffix];
+  const wrap = $('evo-chart-' + suffix);
+  if (!st || !wrap) return;
+  const p = st.pts[k];
+  if (!p) return;
+  st.atual = k;
+  const q = sel => wrap.querySelector(sel);
+  const linha = q('.chr-cross .chr-crossLine');
+  const foco = q('.chr-cross .chr-focus');
+  const tip = q('.chr-tip');
+  if (linha) { linha.setAttribute('x1', p.x); linha.setAttribute('x2', p.x); }
+  if (foco) { foco.setAttribute('cx', p.x); foco.setAttribute('cy', p.y); }
+  if (!tip) return;
+  const set = (sel, txt) => { const e = q(sel); if (e) e.textContent = txt; };
+  set('.chr-tipDate', fmtDate(p.d.iso) || '—');
+  const tag = q('.chr-tipTag');
+  if (tag) {
+    tag.textContent = p.d.pr ? 'PR' : (p.d.dl ? 'DELOAD' : '');
+    tag.className = 'chr-tipTag' + (p.d.pr ? ' chr-tagPr' : (p.d.dl ? ' chr-tagDl' : ''));
+  }
+  set('.chr-tipVal', chrBr(p.d.carga, 1));
+  const partes = [];
+  if (p.d.reps) partes.push(p.d.reps + ' reps');
+  if (p.d.rir) partes.push('RIR ' + p.d.rir);
+  set('.chr-tipR1', partes.join(' · ') || '—');
+  set('.chr-tipR2', p.d.vol != null
+    ? 'volume ' + chrBr(p.d.vol, 0) + ' kg' + (p.d.series ? ' (' + p.d.series + ' séries)' : '')
+    : 'sem reps por série anotadas');
+  wrap.classList.add('chr-on');
+  // posiciona em pixel do wrapper, nao em unidade do viewBox
+  const w = wrap.clientWidth, h = wrap.clientHeight, e = w / st.vbw;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let t = p.y * e - th - 12;
+  if (t < 2) t = p.y * e + 16;
+  tip.style.left = Math.max(2, Math.min(Math.max(2, w - tw - 2), p.x * e - tw / 2)) + 'px';
+  tip.style.top = Math.max(2, Math.min(Math.max(2, h - th - 2), t)) + 'px';
+  if (teclado) {
+    const live = q('.chr-live');
+    if (live) live.textContent = fmtDate(p.d.iso) + ', ' + chrBr(p.d.carga, 1) + ' quilos' +
+      (p.d.pr ? ', novo recorde' : (p.d.dl ? ', deload' : '')) + '.';
+  }
+}
+
+function evoEsconderPonto(suffix) {
+  const st = EVO_SCRUB[suffix];
+  const wrap = $('evo-chart-' + suffix);
+  if (st) st.atual = -1;
+  if (wrap) wrap.classList.remove('chr-on');
+}
+
+// ---------------------------------------------------------------------------
+// v30.4.0: drawEvoChart — mesma assinatura e mesmos chamadores de antes.
+// ---------------------------------------------------------------------------
 function drawEvoChart(regs, suffix) {
   const select = $('evo-select-' + suffix);
-  const canvas = $('evo-chart-' + suffix);
+  const alvo = $('evo-chart-' + suffix);
   const empty = $('evo-chart-empty-' + suffix);
-  if (!canvas) return;
-  // v29.4.0: Chart.js e lazy (ver ensureChartJs). Gate sync-requeue: NAO
-  // transformar esta funcao em async - cliques repetidos no dropdown durante
-  // o load enfileiram callbacks que rodam 100% sync pos-load (o primeiro cai
-  // no new Chart, os demais no caminho de update via APP.evoCharts) -> zero
-  // chance do erro "Canvas is already in use". O select e relido na
-  // re-execucao, entao o redraw final pinta a selecao mais recente.
-  if (!window.Chart) {
-    if (empty) {
-      // guarda o texto padrao ("Sem dados numericos...") pra restaurar depois
-      if (empty.dataset.msgPadrao == null) empty.dataset.msgPadrao = empty.textContent;
-      empty.textContent = 'Carregando grafico...';
-      empty.classList.remove('hidden');
-    }
-    canvas.style.display = 'none';
-    ensureChartJs()
-      .then(() => drawEvoChart(regs, suffix))
-      .catch(() => {
-        if (empty) {
-          empty.textContent = 'Grafico indisponivel offline. Conecte-se uma vez para baixa-lo.';
-          empty.classList.remove('hidden');
-        }
-      });
-    return;
-  }
-  // restaura o texto padrao do "sem dados" caso o gate tenha mexido nele
-  if (empty && empty.dataset.msgPadrao != null) empty.textContent = empty.dataset.msgPadrao;
-  const ex = select ? select.value : null;
+  if (!alvo) return;
+  evoLigarScrub(suffix);
 
-  // v18: modo COMPARAR ALUNOS (trainer): sobrepoe a progressao de todos os
-  // alunos que tem dado numerico de carga pro exercicio selecionado.
+  const ex = select ? select.value : null;
+  const grupoEx = ex ? slugsEquivalentes(ex) : new Set();
   const cmp = $('evo-compare-' + suffix);
   const comparar = !!(cmp && cmp.checked && APP.data && APP.data.alunos);
 
-  // v29.1: casa por grupo de slugs equivalentes (aliases), nao por string
-  // exata — o grafico junta os pontos de todas as grafias do exercicio.
-  // O Set e calculado UMA vez aqui, fora do filter.
-  const grupoEx = ex ? slugsEquivalentes(ex) : new Set();
-  const ptsDe = (lista) => lista
-    .filter(r => grupoEx.has(slugify(r.exercicio)))
-    .map(r => ({ d: dataSessao(r), y: parseCargaNum(r.carga) }))
-    .filter(p => p.y != null)
-    .sort((a, b) => a.d.localeCompare(b.d));
-
-  // ordem validada (skill dataviz): passa os pisos de CVD e de visao normal
-  // na lista adjacente, sobre a superficie escura #12171F.
-  const PALETA = ['#E85616', '#0598CE', '#09A66B', '#BE7C05', '#9276E2', '#EB4D45'];
-  let labels, datasets;
+  const vazio = () => {
+    alvo.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    if (EVO_SCRUB[suffix]) EVO_SCRUB[suffix].pts = [];
+  };
 
   if (comparar) {
     const todos = APP.data.registros || [];
     const series = [];
     (APP.data.alunos || []).forEach(a => {
-      const pts = ptsDe(todos.filter(r => String(r.aluno_id) === String(a.id)));
-      if (pts.length > 0) series.push({ id: String(a.id), nome: a.nome || a.id, pts });
+      const pts = evoPontosDe(todos.filter(r => String(r.aluno_id) === String(a.id)), grupoEx);
+      if (pts.length) series.push({ nome: a.nome || a.id, pts: pts });
     });
-    if (series.length === 0) { canvas.style.display = 'none'; if (empty) empty.classList.remove('hidden'); return; }
-    // eixo X = uniao das datas de todos; cada serie alinha por data (gaps interpolados)
-    const datasUniao = [...new Set(series.flatMap(s => s.pts.map(p => p.d)))].sort();
-    labels = datasUniao.map(fmtDate);
-    datasets = series.map((s, i) => {
-      const mapa = {};
-      s.pts.forEach(p => { mapa[p.d] = p.y; });
-      const ehAtual = String(s.id) === String(APP.currentAluno);
-      const cor = PALETA[i % PALETA.length];
-      return {
-        label: s.nome,
-        data: datasUniao.map(d => mapa[d] != null ? mapa[d] : null),
-        borderColor: cor,
-        backgroundColor: 'transparent',
-        fill: false,
-        spanGaps: true,
-        tension: 0.25,
-        pointRadius: ehAtual ? 4 : 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: cor,
-        borderWidth: ehAtual ? 3 : 1.5,
-        borderDash: ehAtual ? [] : [5, 3],
-      };
-    });
-  } else {
-    const pts = ptsDe(regs);
-    if (pts.length === 0) {
-      canvas.style.display = 'none';
-      if (empty) empty.classList.remove('hidden');
-      return;
-    }
-    const accent = '#E85616';
-    labels = pts.map(p => fmtDate(p.d));
-    datasets = [{
-      label: 'carga (kg)',
-      data: pts.map(p => p.y),
-      borderColor: accent,
-      backgroundColor: 'rgba(232,86,22,0.16)',
-      fill: true,
-      tension: 0.25,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-      pointBackgroundColor: accent,
-      borderWidth: 2,
-    }];
-    // v23: linha de ALVO (meta do exercicio no plano), tracejada laranja
-    const planoArr = (APP.data && APP.data.plano) || [];
-    const pe = planoArr.find(p => grupoEx.has(slugify(p.exercicio)) &&
-      (suffix !== 'trainer' || String(p.aluno_id) === String(APP.currentAluno)));
-    const metaNum = pe ? parseCargaNum(pe.meta) : null;
-    APP._evoAlvo = APP._evoAlvo || {};
-    APP._evoAlvo[suffix] = (metaNum != null && labels.length);
-    if (APP._evoAlvo[suffix]) {
-      datasets.push({
-        label: 'alvo 1 ano (' + metaNum + 'kg)',
-        data: labels.map(() => metaNum),
-        borderColor: '#C77400',
-        backgroundColor: 'transparent',
-        fill: false,
-        pointRadius: 0,
-        borderWidth: 1.5,
-        borderDash: [6, 4],
-      });
-    }
+    if (!series.length) return vazio();
+    if (empty) empty.classList.add('hidden');
+    alvo.innerHTML = '<article class="chr-card">' +
+      '<header class="chr-head"><div class="chr-idt"><div>' +
+      '<h3 class="chr-title">' + escapeHtml(ex || '—') + '</h3>' +
+      '<p class="chr-sub">Comparando ' + series.length + ' alunos</p>' +
+      '</div></div></header>' +
+      '<div class="chr-plotWrap">' + evoSvgComparar(series, suffix) + '</div></article>';
+    if (EVO_SCRUB[suffix]) EVO_SCRUB[suffix].pts = [];   // sem scrub no comparar
+    return;
   }
 
-  canvas.style.display = '';
+  const pts = evoPontosDe(regs, grupoEx);
+  if (!pts.length) return vazio();
   if (empty) empty.classList.add('hidden');
 
-  // OPTIMIZATION (Phase 3A): Update chart data instead of destroy+recreate
-  // This is 6-7x faster (measured: 250ms -> 40ms for 500 workouts)
-  if (APP.evoCharts[suffix]) {
-    // Chart already exists: update data only
-    APP.evoCharts[suffix].data.labels = labels;
-    APP.evoCharts[suffix].data.datasets = datasets;
-    APP.evoCharts[suffix].update('none'); // No animation
-  } else {
-    // First render: create chart
-    APP.evoCharts[suffix] = new Chart(canvas, {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: (comparar || (APP._evoAlvo && APP._evoAlvo[suffix]))
-            ? { display: true, labels: { color: '#5B6472', font: { size: 10, family: 'JetBrains Mono' }, boxWidth: 14 } }
-            : { display: false },
-          tooltip: { displayColors: comparar }
-        },
-        scales: {
-          x: { ticks: { color: '#98A2B1', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: 'rgba(36,44,56,0.9)' }, border: { color: '#242C38' } },
-          y: { ticks: { color: '#98A2B1', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: 'rgba(36,44,56,0.9)' }, border: { color: '#242C38' }, beginAtZero: false }
-        }
-      }
-    });
-  }
+  // linha de ALVO: meta do plano pro exercicio (v23). No trainer, so a do
+  // aluno aberto — senao pegaria a meta de outro aluno com o mesmo exercicio.
+  const planoArr = (APP.data && APP.data.plano) || [];
+  const pe = planoArr.find(p => grupoEx.has(slugify(p.exercicio)) &&
+    (suffix !== 'trainer' || String(p.aluno_id) === String(APP.currentAluno)));
+  const alvoNum = pe ? parseCargaNum(pe.meta) : null;
+
+  const prim = pts[0], ult = pts[pts.length - 1];
+  const delta = ult.carga - prim.carga;
+  const seta = delta > 0 ? 'chr-arrowUp' : (delta < 0 ? 'chr-arrowDown' : '');
+  const nomeEx = ex || '—';
+
+  alvo.innerHTML = '<article class="chr-card">' +
+    '<header class="chr-head"><div class="chr-idt"><div>' +
+    '<h3 class="chr-title">' + escapeHtml(nomeEx) + '</h3>' +
+    '<p class="chr-sub">Carga por sessão · ' + pts.length + (pts.length === 1 ? ' sessão' : ' sessões') +
+    '<br>' + escapeHtml(fmtDate(prim.iso) + ' – ' + fmtDate(ult.iso)) + '</p>' +
+    '</div></div>' +
+    (pts.length > 1 ? '<div class="chr-kpi"><div class="chr-kpiTop">' +
+      (seta ? '<svg class="chr-arrow ' + seta + '" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0.6L8.9 5H6.6V9.2H3.4V5H1.1Z"/></svg>' : '') +
+      '<span class="chr-kpiVal">' + (delta > 0 ? '+' : '') + escapeHtml(chrBr(delta, 1)) + '</span>' +
+      '<span class="chr-kpiUn">kg</span></div>' +
+      '<div class="chr-kpiLab">DESDE ' + escapeHtml(fmtDate(prim.iso)) + '</div></div>' : '') +
+    '</header>' +
+    '<div class="chr-plotWrap" tabindex="0" role="group" aria-label="Gráfico de carga por sessão. Use as setas para percorrer as sessões.">' +
+      evoSvgUnico(pts, suffix, alvoNum, nomeEx) +
+      '<div class="chr-tip" aria-hidden="true">' +
+        '<div class="chr-tipHead"><span class="chr-tipDate">—</span><span class="chr-tipTag"></span></div>' +
+        '<div class="chr-tipMain"><span class="chr-tipVal">—</span><span class="chr-tipUn">kg</span></div>' +
+        '<div class="chr-tipRow chr-tipR1">—</div>' +
+        '<div class="chr-tipRow chr-tipR2">—</div>' +
+      '</div>' +
+      '<div class="chr-live" aria-live="polite"></div>' +
+    '</div></article>';
+
+  // guarda as coordenadas pro scrub achar o ponto mais proximo do dedo
+  const n = pts.length;
+  const cargas = pts.map(p => p.carga);
+  const esc = chrEscala(Math.min.apply(null, cargas), Math.max.apply(null, cargas));
+  EVO_SCRUB[suffix].pts = pts.map((p, i) => ({
+    x: chrNum(chrX(i, n)),
+    y: chrNum(CHR.Y_BASE - ((p.carga - esc.lo) / (esc.hi - esc.lo)) * (CHR.Y_BASE - CHR.Y_TOPO)),
+    d: p,
+  }));
+  EVO_SCRUB[suffix].atual = -1;
 }
 
-// OPTIMIZATION (Phase 3D): Cache grouped sessions for lazy loading
 const APP_EVO_CACHE = {};
 
 function _buildSessionCard(grupo, isTrainer) {
@@ -6113,7 +8014,10 @@ function renderAlunoDashboard() {
     if (!last || d > dataSessao(last)) last = r;
   });
   let ultTxt = last ? `ULT: ${last.dia} · ${daysAgo(dataSessao(last))}` : 'NENHUMA SESSAO DE FORCA';
-  if (lastCardio) ultTxt += `   ·   ${cardioEmoji(lastCardio.modalidade)} ${cardioLabel(lastCardio.modalidade)} ${daysAgo(dataSessao(lastCardio))}`;
+  // v30: cardioEmoji() agora devolve MARKUP, e esta string vai pra
+  // $('aluno-last').textContent — que nao aceita tag nenhuma. Por isso aqui
+  // o simbolo sai e sobra so o rotulo, que ja diz a modalidade por extenso.
+  if (lastCardio) ultTxt += `   ·   ${cardioLabel(lastCardio.modalidade)} ${daysAgo(dataSessao(lastCardio))}`;
   $('aluno-last').textContent = ultTxt;
   const meta = $('aluno-meta');
   let metaHtml = '';
@@ -6250,26 +8154,43 @@ $('btn-salvar-peso').onclick = async () => {
 // dia de forca (A/B/C) em lugar nenhum — so aparece no proprio espaco (card
 // CARDIO na evolucao, dias azuis no calendario, linha no topo do painel).
 const CARDIO_TIPOS = [
-  { v: 'pedal',   label: 'Pedal / Bike', emoji: '🚴' },
-  { v: 'esteira', label: 'Esteira',      emoji: '🏃' },
-  { v: 'remo',    label: 'Remo',         emoji: '🚣' },
-  { v: 'corrida', label: 'Corrida',      emoji: '👟' },
-  { v: 'outro',   label: 'Outro cardio', emoji: '❤️' },
+  // v30: 'emoji' virou 'icone' (id do sprite icn-). cardioLabel() nao usa esse
+  // campo, so cardioEmoji() — trocar o nome deixa obvio que agora e markup.
+  { v: 'pedal',   label: 'Pedal / Bike', icone: 'icn-bike' },
+  { v: 'esteira', label: 'Esteira',      icone: 'icn-esteira' },
+  { v: 'remo',    label: 'Remo',         icone: 'icn-remo' },
+  // corrida reusa a esteira: o sprite nao tem tenis, e a esteira e o desenho
+  // de corrida que ainda le a 13px — o rotulo ao lado separa as duas.
+  { v: 'corrida', label: 'Corrida',      icone: 'icn-esteira' },
+  // 'outro' vai de cronometro: e o unico denominador comum de um cardio que o
+  // aluno nao classificou (o que sempre da pra dizer dele e que durou tempo).
+  { v: 'outro',   label: 'Outro cardio', icone: 'icn-cronometro' },
 ];
 function ehCardio(r) { return String((r && r.modalidade) || '').trim() !== ''; }
 function cardioLabel(v) {
   const t = CARDIO_TIPOS.find(t => t.v === String(v || '').toLowerCase());
   return t ? t.label : (v ? String(v) : 'Cardio');
 }
+// v30: devolve MARKUP de icone, nao mais um caractere. So pode ser usado em
+// contexto de innerHTML — pra texto puro (textContent, toast, title) use
+// cardioLabel(). Sobraram 2 chamadores vivos, os dois em innerHTML:
+// renderEvoStats (o sub do card CARDIO, via stat()) e renderCardioHistorico.
+// icn--inline porque esses dois contextos tem fontes diferentes (9px e 12px):
+// o icone escala em em em vez de ficar gigante num e certo no outro.
+// A coluna modalidade do banco aceita texto livre, entao modalidade
+// desconhecida cai na bike — mesmo default de antes, so que desenhado.
 function cardioEmoji(v) {
   const t = CARDIO_TIPOS.find(t => t.v === String(v || '').toLowerCase());
-  return t ? t.emoji : '🚴';
+  return icnSvg((t && t.icone) || 'icn-bike', 'icn--inline icn--cardio');
 }
 
 $('btn-aluno-cardio').onclick = () => abrirModalCardio();
 function abrirModalCardio() {
   const sel = $('cardio-tipo');
-  sel.innerHTML = CARDIO_TIPOS.map(t => `<option value="${t.v}">${t.emoji} ${t.label}</option>`).join('');
+  // v30: <option> so aceita TEXTO — nao da pra por <svg> aqui em navegador
+  // nenhum. O rotulo sozinho ja identifica a modalidade, entao o simbolo sai.
+  // (Se ficasse ${t.emoji} depois da troca, sairia 'undefined' no dropdown.)
+  sel.innerHTML = CARDIO_TIPOS.map(t => `<option value="${t.v}">${t.label}</option>`).join('');
   $('cardio-nome').value = '';
   $('cardio-obs').value = '';
   $('cardio-status').textContent = '';
@@ -6458,6 +8379,178 @@ function musculosPorRegex(nome) {
   return [...g];
 }
 
+// ===========================================================================
+// v30.1.0: MUSCULOS FINOS (16 grupos) — o que o mapa anatomico pinta.
+// ---------------------------------------------------------------------------
+// POR QUE NAO REUSAR musculosDoExercicio(): aquela funcao devolve os 9 grupos
+// GROSSOS da tabela exercicios (peito ombro triceps costas biceps core
+// quadriceps posterior panturrilha), que e o vocabulario do banco. O desenho
+// da peca tem 16 paths anatomicos. Expandir 9->16 mecanicamente MENTE, e mente
+// feio neste plano: "Face pull" esta cadastrado como primario "ombro"; se
+// "ombro" acendesse deltoide anterior E posterior, o mapa afirmaria que o face
+// pull treinou o deltoide ANTERIOR — enquanto a obs do plano diz, em
+// maiusculas, "NAO fazer elevacao frontal - deltoide anterior ja encurtado,
+// piora a cifose". O app estaria dizendo o oposto do objetivo postural dele.
+//
+// POR QUE REGRA E NAO TABELA POR SLUG: o banco tem ~128 nomes distintos pra
+// ~55 exercicios reais ("Face pull", "Facepull", "Face pull cross", "facepull"),
+// e ele digita nome novo toda semana no + EXERCICIO EXTRA. Tabela por slug
+// nasceria desatualizada. A ORDEM das regras e o que faz elas funcionarem:
+// a especifica vem antes da generica (face pull antes de pull, invertido antes
+// de crucifixo, remador antes de remada, pelvica antes de elevacao).
+//
+// SEM CASAMENTO = SEM DADO. O grupo cai na hachura "sem registro" da peca, que
+// e uma afirmacao honesta. Nunca em 0%, que afirmaria "esta pronto".
+//
+// peso: 1 = primario (recebe o estimulo cheio), 0.6 = secundario.
+// ===========================================================================
+var MAPA_FINOS = [
+  'trapezio', 'deltoide-ant', 'deltoide-post', 'peito', 'biceps', 'triceps',
+  'antebraco', 'abdomen', 'obliquo', 'dorsal', 'costas-sup', 'lombar',
+  'gluteo', 'quadriceps', 'posterior', 'panturrilha'
+];
+
+// Rotulos. 'deltoide-ant' diz "ant./medial" DE PROPOSITO: o desenho nao tem
+// path pro deltoide medio, e elevacao lateral (deltoide medio, o unico ombro
+// que o plano dele manda treinar) so pode acender a cabeca frontal do ombro.
+// Mentir no rotulo seria pior que juntar os dois num nome honesto.
+var MAPA_FINO_LABEL = {
+  'trapezio': 'Trapézio', 'deltoide-ant': 'Deltoide ant./medial',
+  'deltoide-post': 'Deltoide posterior', 'peito': 'Peitoral', 'biceps': 'Bíceps',
+  'triceps': 'Tríceps', 'antebraco': 'Antebraço', 'abdomen': 'Abdômen',
+  'obliquo': 'Oblíquos', 'dorsal': 'Dorsal (latíssimo)', 'costas-sup': 'Costas superiores',
+  'lombar': 'Lombar', 'gluteo': 'Glúteos', 'quadriceps': 'Quadríceps',
+  'posterior': 'Posterior de coxa', 'panturrilha': 'Panturrilha'
+};
+var MAPA_FINO_CURTO = {
+  'trapezio': 'Trapézio', 'deltoide-ant': 'Deltoide ant.', 'deltoide-post': 'Deltoide post.',
+  'peito': 'Peito', 'biceps': 'Bíceps', 'triceps': 'Tríceps', 'antebraco': 'Antebraço',
+  'abdomen': 'Abdômen', 'obliquo': 'Oblíquo', 'dorsal': 'Dorsal', 'costas-sup': 'Costas sup.',
+  'lombar': 'Lombar', 'gluteo': 'Glúteo', 'quadriceps': 'Quadríceps',
+  'posterior': 'Post. de coxa', 'panturrilha': 'Panturrilha'
+};
+
+// [regex, primarios, secundarios]. Primeira que casa PARA a varredura.
+var MAPA_REGRAS = [
+  // --- ombro/costas altas: as especificas primeiro ---
+  [/face\s*pull|pull[\s-]*apart/,            ['deltoide-post', 'trapezio'], ['costas-sup']],
+  [/y[\s-]*raise|ypsilon/,                   ['trapezio'], ['deltoide-post']],
+  [/invertid|voador\s*invers|reverse\s*fly/, ['deltoide-post'], ['costas-sup', 'trapezio']],
+  [/encolhimento|shrug/,                     ['trapezio'], []],
+  // elevacao PELVICA nao e elevacao de ombro — tem que vir antes
+  [/pelvic|p[eé]lvic|hip\s*thrust/,          ['gluteo'], ['posterior']],
+  // el[ea]va cobre o "Elavacao" que existe no banco; "layeral" idem. Ele digita
+  // o nome em pe, no celular, com uma mao — errar letra e o normal, nao a exceção.
+  [/el[ea]vac|el[ea]va[çc]|\blateral\b|layeral/, ['deltoide-ant'], ['trapezio']],
+  [/desenvolv|shoulder\s*press|militar|overhead|arnold/,
+                                             ['deltoide-ant'], ['triceps', 'trapezio']],
+  // --- peito ---
+  [/supino|crucifixo|voador|peck|chest|peito/,
+                                             ['peito'], ['deltoide-ant', 'triceps']],
+  // --- braco ---
+  [/martelo|hammer/,                         ['biceps', 'antebraco'], []],
+  [/rosca|curl|scott|b[ií]ceps|bicipes/,     ['biceps'], ['antebraco']],
+  [/tr[ií]ceps|testa|franc[eê]s|pushdown|paralela|mergulho|coice|kickback/,
+                                             ['triceps'], []],
+  [/antebra[çc]|farmer|punho|wrist/,         ['antebraco'], []],
+  // --- core: remador ABDOMINAL vem antes de remada ---
+  [/remador/,                                ['abdomen'], ['obliquo']],
+  [/pallof|anti[\s-]*rota|obl[ií]qu|dead\s*bug|russian/,
+                                             ['obliquo'], ['abdomen']],
+  [/abdominal|abs\b|crunch|prancha|plank|infra|core\b/,
+                                             ['abdomen'], ['obliquo']],
+  // --- costas ---
+  [/puxada|pulldown|pull[\s-]*up|barra\s*fixa|graviton/,
+                                             ['dorsal'], ['biceps', 'costas-sup', 'antebraco']],
+  [/remada|\brow\b|serrote/,                 ['costas-sup', 'dorsal'],
+                                             ['biceps', 'deltoide-post', 'trapezio']],
+  [/extensor\s*lombar|hiperexten|lombar/,    ['lombar'], ['gluteo', 'posterior']],
+  // --- posterior / perna ---
+  [/terra|deadlift/,                         ['posterior', 'lombar', 'gluteo'],
+                                             ['dorsal', 'trapezio', 'quadriceps', 'antebraco']],
+  [/stiff|\brdl\b|romen/,                    ['posterior'], ['lombar', 'gluteo']],
+  [/flexora|isquio|hamstring/,               ['posterior'], []],
+  [/abdutora|abduc|abdu[çc]|abduction|gl[uú]teo/, ['gluteo'], []],
+  [/adutora|aductor|adutor/,                 ['quadriceps'], ['gluteo']],
+  [/panturrilha|calf|gemeos|g[eê]meos|s[oó]leo|gastro/, ['panturrilha'], []],
+  // ISOLAMENTO de quadriceps vem ANTES do composto: cadeira extensora nao
+  // recruta gluteo nem posterior (o joelho estende, o quadril nao se move).
+  // Junta-la com agachamento pintaria a perna inteira depois de um exercicio
+  // que so trabalha o quadriceps.
+  [/extensora|cadeira\s*ext|leg\s*extension/, ['quadriceps'], []],
+  [/agacha|squat|hack|leg\s*press|afundo|avanco|avan[çc]o|bulgaro|passada/,
+                                             ['quadriceps'], ['gluteo', 'posterior']],
+];
+
+function musculosFinosDoExercicio(nome) {
+  var s = String(nome == null ? '' : nome).toLowerCase();
+  // tira acento pra regra nao precisar de variante dupla; as regras que
+  // dependem de acento (p[eé]lvic) ja tratam os dois lados.
+  var sa = s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s;
+  for (var i = 0; i < MAPA_REGRAS.length; i++) {
+    var r = MAPA_REGRAS[i];
+    if (r[0].test(s) || r[0].test(sa)) {
+      var out = [];
+      r[1].forEach(function (g) { out.push({ g: g, peso: 1 }); });
+      r[2].forEach(function (g) { out.push({ g: g, peso: 0.6 }); });
+      return out;
+    }
+  }
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// v30.3.0: RECUPERACAO EM PERCENTUAL (o que a peca pinta)
+// A v25 tinha 3 estados discretos por dias desde o ultimo treino. A peca tem
+// uma rampa sequencial de 4 bandas, entao precisa de numero.
+//   v = 100 * (JANELA - dias)/JANELA * peso
+// JANELA = 4 dias: dia 0 -> 100, dia 1 -> 75, dia 2 -> 50, dia 3 -> 25,
+// dia 4+ -> 0 (pronto). peso 1 pro primario, 0,6 pro secundario — um grupo que
+// so pegou trabalho indireto nao fica tao "quente" quanto o alvo do exercicio.
+// O grupo fica com o MAIOR v entre todos os exercicios que o tocaram, e com o
+// dia MAIS RECENTE pra frase "ult. treino" (sao duas perguntas diferentes:
+// "quanto ainda esta em recuperacao" e "quando foi a ultima vez").
+// v null = SEM REGISTRO (hachura). Diferente de v 0, que afirma "esta pronto".
+// ---------------------------------------------------------------------------
+const MAPA_JANELA_DIAS = 4;
+const MAPA_MAX_DIAS = 60;   // alem disso nao interessa pro mapa e nem entra na conta
+
+function mapaQuandoTxt(dias) {
+  if (dias == null) return '—';
+  if (dias <= 0) return 'hoje';
+  if (dias === 1) return 'ontem';
+  return 'há ' + dias + ' dias';
+}
+
+function calcularRecuperacaoFina() {
+  const regs = (APP.data && Array.isArray(APP.data.registros)) ? APP.data.registros : [];
+  const acc = {};
+  regs.forEach(r => {
+    if (ehCardio(r)) return;               // cardio nao recupera musculo de forca
+    const dias = mapaIsoParaDias(dataSessao(r));
+    // mapaIsoParaDias devolve 9999 pra data invalida; registro no FUTURO
+    // (data digitada errada) tambem sai fora, senao viraria 100% pra sempre.
+    if (dias == null || dias < 0 || dias > MAPA_MAX_DIAS) return;
+    const base = Math.max(0, (MAPA_JANELA_DIAS - dias) / MAPA_JANELA_DIAS);
+    musculosFinosDoExercicio(r.exercicio).forEach(m => {
+      const v = Math.round(100 * base * m.peso);
+      if (!acc[m.g]) acc[m.g] = { v: 0, dias: null };
+      if (v > acc[m.g].v) acc[m.g].v = v;
+      if (acc[m.g].dias == null || dias < acc[m.g].dias) acc[m.g].dias = dias;
+    });
+  });
+  return MAPA_FINOS.map(g => {
+    const a = acc[g];
+    return {
+      id: g,
+      nome: MAPA_FINO_LABEL[g] || g,
+      curto: MAPA_FINO_CURTO[g] || g,
+      v: a ? a.v : null,
+      quando: a ? mapaQuandoTxt(a.dias) : '—',
+    };
+  });
+}
+
 function mapaIsoParaDias(iso) {
   const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return 9999;
@@ -6503,76 +8596,258 @@ function mapaSugerirDia(status) {
   return best;
 }
 
-function mapaCorpoSVG(status) {
-  const c = g => MAPA_COR[(status[g] && status[g].st) || 'dim'];
-  const S = 'stroke="#0B0E13" stroke-width="1"';
-  // v25: silhueta cheia (mesma frente/costas) + musculos por cima com contorno.
-  // v29: silhueta clara (cinza-gelo) + separadores brancos p/ tema claro.
-  const sil = `
-    <g fill="#1B2430" stroke="#323C4B" stroke-width="0.8">
-      <circle cx="60" cy="20" r="12"/><rect x="55" y="29" width="10" height="7" rx="2"/>
-      <rect x="40" y="44" width="40" height="74" rx="14"/><rect x="44" y="112" width="32" height="22" rx="9"/>
-      <ellipse cx="24" cy="78" rx="9" ry="22"/><ellipse cx="96" cy="78" rx="9" ry="22"/>
-      <ellipse cx="20" cy="120" rx="7.5" ry="20"/><ellipse cx="100" cy="120" rx="7.5" ry="20"/>
-      <ellipse cx="50" cy="166" rx="12.5" ry="31"/><ellipse cx="70" cy="166" rx="12.5" ry="31"/>
-      <ellipse cx="50" cy="214" rx="9" ry="25"/><ellipse cx="70" cy="214" rx="9" ry="25"/>
-    </g>`;
-  const frente = `
-    <ellipse cx="33" cy="53" rx="12" ry="10" fill="${c('ombro')}" ${S}/><ellipse cx="87" cy="53" rx="12" ry="10" fill="${c('ombro')}" ${S}/>
-    <path d="M43 50 h15 a5 5 0 015 5 v9 a5 5 0 01-5 5 h-15 a5 5 0 01-5 -5 v-9 a5 5 0 015 -5z" fill="${c('peito')}" ${S}/>
-    <path d="M62 50 h15 a5 5 0 015 5 v9 a5 5 0 01-5 5 h-15 a5 5 0 01-5 -5 v-9 a5 5 0 015 -5z" fill="${c('peito')}" ${S}/>
-    <ellipse cx="24" cy="77" rx="8" ry="16" fill="${c('biceps')}" ${S}/><ellipse cx="96" cy="77" rx="8" ry="16" fill="${c('biceps')}" ${S}/>
-    <rect x="51" y="78" width="18" height="34" rx="5" fill="${c('core')}" ${S}/>
-    <line x1="60" y1="80" x2="60" y2="110" stroke="#0B0E13" stroke-width="0.8"/>
-    <line x1="52" y1="90" x2="68" y2="90" stroke="#0B0E13" stroke-width="0.8"/><line x1="52" y1="100" x2="68" y2="100" stroke="#0B0E13" stroke-width="0.8"/>
-    <ellipse cx="50" cy="166" rx="11" ry="28" fill="${c('quadriceps')}" ${S}/><ellipse cx="70" cy="166" rx="11" ry="28" fill="${c('quadriceps')}" ${S}/>`;
-  const costas = `
-    <path d="M48 46 L72 46 L66 60 L54 60 Z" fill="${c('costas')}" ${S}/>
-    <path d="M44 60 L58 63 L55 96 L46 84 Z" fill="${c('costas')}" ${S}/><path d="M76 60 L62 63 L65 96 L74 84 Z" fill="${c('costas')}" ${S}/>
-    <line x1="60" y1="58" x2="60" y2="112" stroke="#0B0E13" stroke-width="0.8"/>
-    <ellipse cx="24" cy="77" rx="8" ry="16" fill="${c('triceps')}" ${S}/><ellipse cx="96" cy="77" rx="8" ry="16" fill="${c('triceps')}" ${S}/>
-    <ellipse cx="53" cy="124" rx="10" ry="11" fill="${c('posterior')}" ${S}/><ellipse cx="67" cy="124" rx="10" ry="11" fill="${c('posterior')}" ${S}/>
-    <ellipse cx="50" cy="168" rx="11" ry="27" fill="${c('posterior')}" ${S}/><ellipse cx="70" cy="168" rx="11" ry="27" fill="${c('posterior')}" ${S}/>
-    <ellipse cx="50" cy="214" rx="8.5" ry="22" fill="${c('panturrilha')}" ${S}/><ellipse cx="70" cy="214" rx="8.5" ry="22" fill="${c('panturrilha')}" ${S}/>`;
-  const lbl = 'text-anchor="middle" fill="#8B93A0" style="font:8px monospace;letter-spacing:2px"';
-  return `
-  <svg viewBox="0 0 300 252" class="w-full" style="max-width:340px;margin:0 auto;display:block" role="img" aria-label="Mapa muscular de recuperacao, frente e costas">
-    <g transform="translate(0,4)">${sil}${frente}<text x="60" y="250" ${lbl}>FRENTE</text></g>
-    <g transform="translate(170,4)">${sil}${costas}<text x="60" y="250" ${lbl}>COSTAS</text></g>
-  </svg>`;
+// ===========================================================================
+// v30.3.0: MAPA MUSCULAR — a maquina da peca `mapa`.
+// O markup e ESTATICO no body (SVG de ~17 KB que nunca muda). Aqui so muda a
+// cor de cada path, a lista, o chip do cabecalho e o painel de sugestao.
+// Os eventos sao DELEGADOS no #aluno-mapa e ligados UMA vez (MAPA._ligado):
+// o IIFE original da peca casava .map-card na carga e se marcava com
+// data-map-init — no app o dashboard re-renderiza, e aquele desenho ou nao
+// religava, ou (se religasse) empilharia um listener por render.
+// ===========================================================================
+const MAPA_BANDAS = [
+  { cor: '#2A3340', estado: 'pronto' },
+  { cor: '#C54302', estado: 'quase pronto' },
+  { cor: '#E85616', estado: 'recuperando' },
+  { cor: '#FF7645', estado: 'em brasa' },
+];
+const MAPA_HACHURA = 'url(#map-hachura)';
+
+const MAPA = { reg: {}, atual: null, travado: false, _ligado: false };
+
+function mapaBandaDe(v) {
+  if (v == null) return -1;
+  if (v <= 0) return 0;
+  if (v <= 33) return 1;
+  if (v <= 66) return 2;
+  return 3;
 }
 
+function mapaRaiz()  { return document.querySelector('#aluno-mapa .map-card'); }
+function mapaGaugeHtml(n, cor) {
+  const st = (n > 0 && cor) ? ' style="--map-c:' + cor + '"' : '';
+  return '<span class="map-gauge" data-n="' + (n < 0 ? 'x' : n) + '"' + st + '><i></i><i></i><i></i></span>';
+}
+
+// Desenha a lista + pinta os paths. dados = saida de calcularRecuperacaoFina().
+function mapaPintar(dados) {
+  const raiz = mapaRaiz();
+  if (!raiz) return;
+  const svg = raiz.querySelector('.map-svg');
+  const lista = raiz.querySelector('.map-lista');
+  const chip = raiz.querySelector('.map-chip-txt');
+  if (!svg || !lista) return;
+
+  MAPA.reg = {};
+  MAPA.atual = null;
+  MAPA.travado = false;
+  let quentes = 0;
+
+  // ordem da LISTA: mais quente primeiro, sem-registro por ultimo. O DESENHO
+  // nao muda de ordem (cada path tem lugar fixo no corpo).
+  const ordem = dados.slice().sort((a, b) => {
+    if (a.v == null) return 1;
+    if (b.v == null) return -1;
+    return b.v - a.v;
+  });
+
+  const linhas = [];
+  ordem.forEach(dd => {
+    const n = mapaBandaDe(dd.v);
+    const cor = n < 0 ? MAPA_HACHURA : MAPA_BANDAS[n].cor;
+    const estado = n < 0 ? 'sem registro' : MAPA_BANDAS[n].estado;
+    if (n === 3) quentes++;
+
+    const p = svg.querySelector('.map-m[data-grupo="' + dd.id + '"]');
+    if (p) {
+      p.style.setProperty('--map-c', cor);
+      if (n < 0) p.setAttribute('data-sem', '1'); else p.removeAttribute('data-sem');
+      p.classList.toggle('map-m--quente', n === 3);
+      p.classList.remove('map-on');
+    }
+    MAPA.reg[dd.id] = { d: dd, n: n, cor: cor, estado: estado };
+
+    const sem = (dd.v == null);
+    // aria-label repete tudo em palavra: o desenho e aria-hidden, quem descreve
+    // o dado pro leitor de tela e esta lista (que tambem e o alvo de toque).
+    const rot = dd.nome + ': ' + (sem ? 'sem registro no período'
+      : dd.v + ' por cento em recuperação, ' + estado + ', último treino ' + dd.quando) + '.';
+    linhas.push(
+      '<button type="button" class="map-item" data-alvo="' + dd.id + '" aria-pressed="false" aria-label="' +
+      escapeHtml(rot) + '">' + mapaGaugeHtml(n, cor) +
+      '<span class="map-i-txt"><span class="map-nome">' + escapeHtml(dd.curto) + '</span>' +
+      '<span class="map-quando">' + escapeHtml(sem ? 'sem registro' : dd.quando) + '</span></span>' +
+      '<span class="map-val">' + (sem ? '—' : dd.v + '%') + '</span></button>');
+  });
+  lista.innerHTML = linhas.join('');
+  if (chip) chip.textContent = quentes === 0 ? 'nada em brasa'
+    : (quentes === 1 ? '1 em brasa' : quentes + ' em brasa');
+  mapaLimparFoco();
+}
+
+function mapaLimparFoco() {
+  const raiz = mapaRaiz();
+  if (!raiz) return;
+  raiz.querySelectorAll('.map-m.map-on').forEach(e => e.classList.remove('map-on'));
+  raiz.querySelectorAll('.map-item').forEach(e => {
+    e.classList.remove('map-on');
+    e.setAttribute('aria-pressed', 'false');
+  });
+  const svg = raiz.querySelector('.map-svg');
+  const tip = raiz.querySelector('.map-tip');
+  if (svg) svg.classList.remove('map-foco');
+  if (tip) tip.classList.remove('map-on');
+  MAPA.atual = null;
+  MAPA.travado = false;
+}
+
+function mapaPosicionarTip(p) {
+  const raiz = mapaRaiz();
+  const palco = raiz && raiz.querySelector('.map-palco');
+  const tip = raiz && raiz.querySelector('.map-tip');
+  if (!palco || !tip || !p) return;
+  const rp = palco.getBoundingClientRect();
+  const rb = p.getBoundingClientRect();
+  const cx = rb.left + rb.width / 2 - rp.left;
+  const topo = rb.top - rp.top;
+  const base = rb.bottom - rp.top;
+  const lw = tip.offsetWidth, lh = tip.offsetHeight;
+  const x = Math.min(Math.max(cx, lw / 2 + 4), Math.max(lw / 2 + 4, rp.width - lw / 2 - 4));
+  const acima = topo > lh + 12;
+  tip.style.left = x + 'px';
+  tip.style.top = (acima ? topo - 8 : base + 8) + 'px';
+  tip.style.transform = acima ? 'translate(-50%,-100%)' : 'translate(-50%,0)';
+}
+
+function mapaMostrar(id, fixar) {
+  const raiz = mapaRaiz();
+  const r = MAPA.reg[id];
+  if (!raiz || !r) return;
+  const tip = raiz.querySelector('.map-tip');
+  const svg = raiz.querySelector('.map-svg');
+  if (!tip || !svg) return;
+  const sem = (r.d.v == null);
+
+  const g = tip.querySelector('.map-gauge');
+  if (g) {
+    g.setAttribute('data-n', r.n < 0 ? 'x' : String(r.n));
+    if (r.n > 0) g.style.setProperty('--map-c', r.cor); else g.style.removeProperty('--map-c');
+  }
+  const set = (sel, txt) => { const e = tip.querySelector(sel); if (e) e.textContent = txt; };
+  set('.map-tip-nome', r.d.nome);
+  set('.map-tip-tag', r.estado);
+  set('.map-tip-quando', sem ? '—' : r.d.quando);
+  set('.map-tip-val', sem ? '—' : r.d.v + '%');
+
+  raiz.querySelectorAll('.map-m').forEach(e =>
+    e.classList.toggle('map-on', e.getAttribute('data-grupo') === id));
+  raiz.querySelectorAll('.map-item').forEach(e => {
+    const on = e.getAttribute('data-alvo') === id;
+    e.classList.toggle('map-on', on);
+    e.setAttribute('aria-pressed', (on && fixar) ? 'true' : 'false');
+  });
+  svg.classList.add('map-foco');
+  tip.classList.add('map-on');
+  mapaPosicionarTip(raiz.querySelector('.map-m[data-grupo="' + id + '"]'));
+  MAPA.atual = id;
+  MAPA.travado = !!fixar;
+}
+
+// alvo do evento: o <path> do corpo ou o botao da lista. Em SVG antigo o
+// target pode ser o elemento de dentro de um <use> — correspondingUseElement
+// devolve o no que o CSS/JS enxerga.
+function mapaAlvoDe(ev) {
+  let el = ev.target;
+  if (!el) return null;
+  if (el.correspondingUseElement) el = el.correspondingUseElement;
+  if (!el.closest) return null;
+  const no = el.closest('.map-m, .map-item');
+  if (!no) return null;
+  return no.classList.contains('map-m')
+    ? no.getAttribute('data-grupo')
+    : no.getAttribute('data-alvo');
+}
+
+// Ligado UMA vez, delegado no container que nunca e substituido.
+function mapaLigarEventos() {
+  if (MAPA._ligado) return;
+  const cont = document.getElementById('aluno-mapa');
+  if (!cont) return;
+  MAPA._ligado = true;
+
+  cont.addEventListener('pointerover', ev => {
+    if (ev.pointerType === 'touch' || MAPA.travado) return;
+    const id = mapaAlvoDe(ev);
+    if (id && id !== MAPA.atual) mapaMostrar(id, false);
+  });
+  cont.addEventListener('pointerout', ev => {
+    if (MAPA.travado || ev.pointerType === 'touch') return;
+    let para = ev.relatedTarget;
+    if (para && para.correspondingUseElement) para = para.correspondingUseElement;
+    if (para && para.closest && para.closest('.map-m, .map-item')) return;
+    mapaLimparFoco();
+  });
+  cont.addEventListener('click', ev => {
+    const id = mapaAlvoDe(ev);
+    if (!id) return;
+    if (MAPA.travado && MAPA.atual === id) mapaLimparFoco(); else mapaMostrar(id, true);
+  });
+  cont.addEventListener('focusin', ev => {
+    const id = mapaAlvoDe(ev);
+    if (id) mapaMostrar(id, MAPA.travado && MAPA.atual === id);
+  });
+  cont.addEventListener('focusout', ev => {
+    if (MAPA.travado) return;
+    const para = ev.relatedTarget;
+    if (para && para.closest && para.closest('.map-item')) return;
+    mapaLimparFoco();
+  });
+  cont.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && MAPA.atual) mapaLimparFoco();
+  });
+  document.addEventListener('pointerdown', ev => {
+    if (MAPA.atual && !cont.contains(ev.target)) mapaLimparFoco();
+  }, true);
+  window.addEventListener('resize', () => {
+    if (MAPA.atual) mapaPosicionarTip(
+      document.querySelector('#aluno-mapa .map-m[data-grupo="' + MAPA.atual + '"]'));
+  });
+}
+
+// v30.3.0: o painel "PRONTO PRA TREINAR" e o nudge de grupo atrasado sobrevivem
+// da v25 — sao a unica parte da tela que diz o que FAZER, e nenhuma peca de
+// desenho substitui isso. Continuam saindo de calcularRecuperacao() (9 grupos
+// grossos), que e o vocabulario que mapaSugerirDia() e o plano usam. As duas
+// contas convivem de proposito: a fina PINTA, a grossa DECIDE o dia.
 function renderMapaMuscular() {
   const cont = document.getElementById('aluno-mapa');
   if (!cont || !APP.data) return;
+  mapaLigarEventos();
+  mapaPintar(calcularRecuperacaoFina());
+
   const regs = APP.data.registros || [];
   const calc = calcularRecuperacao();
   const status = calc.status;
   const sug = mapaSugerirDia(status);
-  const atrasados = MAPA_GRUPOS.filter(g => status[g].st === 'atrasado' && status[g].dias != null).sort((a, b) => status[b].dias - status[a].dias);
+  const atrasados = MAPA_GRUPOS
+    .filter(g => status[g].st === 'atrasado' && status[g].dias != null)
+    .sort((a, b) => status[b].dias - status[a].dias);
   const nud = atrasados[0];
-  const dot = cor => `<i style="width:8px;height:8px;border-radius:50%;background:${cor};display:inline-block"></i>`;
-  const legenda = `<div class="flex justify-center gap-4 mt-3">
-      <span class="mono text-[9px] text-zinc-400 flex items-center gap-1">${dot(MAPA_COR.pronto)}Pronto</span>
-      <span class="mono text-[9px] text-zinc-400 flex items-center gap-1">${dot(MAPA_COR.recuperando)}Recuperando</span>
-      <span class="mono text-[9px] text-zinc-400 flex items-center gap-1">${dot(MAPA_COR.atrasado)}Atrasado</span></div>`;
-  let painel;
+  const painel = document.getElementById('aluno-mapa-painel');
+  if (!painel) return;
   if (!regs.length) {
-    painel = `<div class="mt-4 rounded-2xl border border-zinc-700 p-4">
+    painel.innerHTML = `<div class="mt-4 rounded-2xl border border-zinc-700 p-4">
       <div class="mono text-[10px] text-cyan-400 tracking-widest mb-1">COMECE POR AQUI</div>
       <div class="display text-2xl">TREINO ${sug ? sug.dia : 'A'}</div>
       <div class="text-sm text-zinc-400 mt-1">Registre suas sessoes pra eu colorir o mapa e dizer o que treinar.</div></div>`;
-  } else {
-    const foco = sug ? sug.grupos.map(g => MAPA_LABEL[g]).filter(Boolean).slice(0, 3).join(' · ') : '';
-    painel = `<div class="mt-4 rounded-2xl p-4" style="border:1px solid rgba(9,166,107,.45);background:rgba(9,166,107,.14)">
+    return;
+  }
+  const foco = sug ? sug.grupos.map(g => MAPA_LABEL[g]).filter(Boolean).slice(0, 3).join(' · ') : '';
+  painel.innerHTML = `<div class="mt-4 rounded-2xl p-4" style="border:1px solid rgba(9,166,107,.45);background:rgba(9,166,107,.14)">
       <div class="mono text-[10px] tracking-widest mb-1" style="color:${MAPA_COR.pronto}">PRONTO PRA TREINAR</div>
       <div class="display text-3xl">TREINO ${sug ? sug.dia : '—'}</div>
       <div class="text-sm text-zinc-400 mt-1">${escapeHtml(foco)} recuperados.</div>
       ${nud ? `<div class="text-xs mt-2" style="color:${MAPA_COR.atrasado}">⚠ ${escapeHtml(MAPA_LABEL[nud])} atrasado ha ${status[nud].dias} dias — encaixe logo.</div>` : ''}</div>`;
-  }
-  cont.innerHTML = `<div class="glass p-5">
-      <div class="mono text-[10px] text-zinc-500 tracking-widest mb-3">MAPA MUSCULAR · RECUPERACAO</div>
-      ${mapaCorpoSVG(status)}${legenda}${painel}</div>`;
 }
 
 function renderAlunoHistorico() {
@@ -7136,7 +9411,11 @@ function sugestaoProgressao(nome, planoItem) {
   const metaNum = parseCargaNum(p.meta);
   if (cargaNum != null && metaNum != null && cargaNum >= metaNum) {
     return { ult, tipo: 'meta', novaCarga: null,
-      texto: '🎯 META DO PLANO ATINGIDA (' + String(p.meta) + ') — fala com o trainer sobre o proximo alvo' };
+      // v30: sem emoji. Este 'texto' vai TANTO pra innerHTML (via escapeHtml)
+      // quanto pra textContent, entao nao pode carregar markup. Fica com
+      // marcador tipografico ✓, na mesma familia dos ↑ e = das outras
+      // sugestoes logo abaixo — e o unico jeito de os tres alinharem na mono.
+      texto: '✓ META DO PLANO ATINGIDA (' + String(p.meta) + ') — fala com o trainer sobre o proximo alvo' };
   }
   // carga sem numero ("peso corp.") ou composta: mostra so o historico.
   if (cargaNum == null || !cargaEhSimples(ult.carga)) {

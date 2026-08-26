@@ -45,11 +45,14 @@
  * dashboard do aluno em localStorage) - bump aqui so pra invalidar o cache
  * antigo do shell. As chamadas novas continuam sendo ao Apps Script
  * (network-only aqui, nada muda neste arquivo alem da versao).
- * v29.4.0: PERFORMANCE 2 + BUGFIX neste arquivo. (1) O HTML tirou o
- * Chart.js do <head> e carrega sob demanda na EVOLUCAO - a entrada do
- * cdnjs em ASSETS CONTINUA aqui de proposito (o precache e o que faz o
- * load on-demand ser instantaneo e funcionar offline; a URL precisa bater
- * com CHARTJS_URL no HTML). (2) BUGFIX: os catches do fetch handler
+ * v30.6.0: A ENTRADA DO CDNJS SAIU DO ASSETS. O Chart.js nao existe mais
+ * no app - o grafico da EVOLUCAO virou SVG gerado pelo proprio HTML
+ * (evoSvgUnico/evoSvgComparar). Com isso morreu tambem o estado "grafico
+ * indisponivel offline". Nao repor esta entrada sem repor a lib.
+ * v29.4.0 (historico, ver acima o que mudou): PERFORMANCE 2 + BUGFIX neste
+ * arquivo. (1) O HTML tirou o Chart.js do <head> e passou a carregar sob
+ * demanda na EVOLUCAO, e a entrada do cdnjs ficava em ASSETS pro precache
+ * fazer esse load ser instantaneo e funcionar offline. (2) BUGFIX: os catches do fetch handler
  * devolviam ./forja.html pra QUALQUER request que falhasse - um script ou
  * chamada de API offline recebia HTML com status 200 (onerror nao dispara,
  * erro silencioso). Agora so requests de NAVEGACAO caem pro shell; todo o
@@ -90,7 +93,7 @@
  * o shell antigo.
  */
 
-const CACHE_VERSION = 'forja-v30.2.0';
+const CACHE_VERSION = 'forja-v30.6.0';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const ASSETS = [
   './',
@@ -98,8 +101,7 @@ const ASSETS = [
   './manual.html',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;800&display=swap',
-  'https://fonts.gstatic.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
+  'https://fonts.gstatic.com'
 ];
 
 self.addEventListener('install', e => {

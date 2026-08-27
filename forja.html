@@ -5416,7 +5416,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v30.6.0';
+const FORJA_VERSION = 'v30.6.1';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao
@@ -5638,6 +5638,25 @@ function tierDoCardMotivacional(item) {
 // treinosMesPassado passa por Number: sem isso um campeao sem esse campo
 // escrevia literalmente "undefined treinos" na tela. Numero valido (inclusive
 // em texto, "12") sai identico ao de antes.
+// ===== v30: JOGO DE ICONES (sprite icn-) =====
+// Monta a tag de um simbolo do sprite. Devolve STRING e nao elemento porque
+// todo render do app monta HTML por template e injeta via innerHTML; devolver
+// no obrigaria a reescrever esses renders inteiros.
+// Seguro contra injecao porque so entra id FIXO escrito no proprio codigo -
+// nada do banco passa por aqui. Se o id nao existir no sprite, o <use> nao
+// pinta nada (falha silenciosa, sem quebrar o layout em volta).
+// aria-hidden: quem descreve a acao e o TEXTO do botao, nunca o desenho.
+// focusable="false": sem isso, motores legados metem o <svg> na ordem de
+// tabulacao e o polegar/teclado para num alvo que nao faz nada.
+// Sem viewBox no <svg> de proposito: o <use> vira 100%x100% da caixa que o
+// CSS deu, e o viewBox do <symbol> (0 0 24 24) faz o encaixe - e assim que o
+// stroke-width escala junto com --icn-size.
+function icnSvg(id, cls) {
+  var extra = cls ? ' ' + cls : '';
+  return '<svg class="icn' + extra + '" aria-hidden="true" focusable="false">' +
+         '<use href="#' + id + '"></use></svg>';
+}
+
 function partesDoCardMotivacional(item) {
   const it = item || {};
   // campeao do mes: medalha em tinta de texto com o miolo em brasa (--icn-hot).
@@ -7018,11 +7037,16 @@ function _renderEvo(suffix) {
   // o calendario recebe os dois (pinta cardio de azul).
   const forca = filtrados.filter(r => !ehCardio(r));
   const cardio = filtrados.filter(ehCardio);
-  renderPeriodoBtns(suffix);
-  renderEvoStats(forca, 'evo-stats-' + suffix, cardio);
-  renderEvoCalendario(filtrados, 'evo-calendario-' + suffix);
-  renderEvoHistorico(forca, 'evo-historico-' + suffix, full.isTrainer);
-  setupEvoChart(forca, suffix);
+  const _evoEtapas = [
+    () => renderPeriodoBtns(suffix),
+    () => renderEvoStats(forca, 'evo-stats-' + suffix, cardio),
+    () => renderEvoCalendario(filtrados, 'evo-calendario-' + suffix),
+    () => renderEvoHistorico(forca, 'evo-historico-' + suffix, full.isTrainer),
+    () => setupEvoChart(forca, suffix),
+  ];
+  for (const _etapa of _evoEtapas) {
+    try { _etapa(); } catch (e) { console.error('_renderEvo', e); }
+  }
 }
 function renderEvolucao(regs, suffix, isTrainer) {
   // v30.4.0: o warm-up do Chart.js saiu junto com a lib. Nao ha mais nada pra
@@ -8197,8 +8221,8 @@ function abrirModalCardio() {
   const hoje = new Date();
   $('cardio-data').value =
     `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
-  renderCardioHistorico();
   $('modal-cardio').classList.remove('hidden');
+  try { renderCardioHistorico(); } catch (e) { console.error('renderCardioHistorico', e); toast('Erro ao carregar historico de cardio: ' + e.message, 'error'); }
 }
 function renderCardioHistorico() {
   const c = $('cardio-historico'); if (!c) return;
@@ -10562,8 +10586,6 @@ async function finalizarTreinar() {
   TREINAR.active = false;
   if (TREINAR.timerInt) { clearInterval(TREINAR.timerInt); TREINAR.timerInt = null; }
   if (TREINAR.restTimer) { clearInterval(TREINAR.restTimer); TREINAR.restTimer = null; }
-  // OPTIMIZATION: Flush buffer batch immediately (don't wait 500ms on finalize)
-  if (_bufferBatchTimer) { clearTimeout(_bufferBatchTimer); _flushBufferBatch(); }
   // v26: garante que uma sessao sobrescrita seja limpa mesmo saindo pelo ◂ SAIR,
   // e reenvia o que ficou no buffer antes de recarregar os dados.
   // OPTIMIZATION (Phase 3C): Parallelize independent API calls
@@ -10576,10 +10598,16 @@ async function finalizarTreinar() {
 }
 
 function encerrarTreinar() {
-  if (TREINAR.resultados.length > 0) {
-    if (!confirm('Sair do modo TREINAR AGORA? Os registros ja salvos sao mantidos.')) return;
+  try {
+    if (TREINAR.resultados.length > 0 &&
+        !confirm('Sair do modo TREINAR AGORA? Os registros ja salvos sao mantidos.')) {
+      toast('Saida cancelada', 'info');
+      return;
+    }
+  } catch (e) {
+    // confirm() suprimido pelo navegador: sai assim mesmo em vez de travar
   }
-  finalizarTreinar();
+  finalizarTreinar().catch(e => { console.error('finalizarTreinar', e); toast('Erro ao sair: ' + e.message, 'error'); });
 }
 
 $('btn-aluno-treinar').onclick = iniciarTreinar;
@@ -10614,6 +10642,8 @@ document.addEventListener('visibilitychange', () => {
 
 // ---------- BOOT ----------
 
+window.addEventListener('error', e => { try { toast('ERRO: ' + e.message, 'error'); } catch (_) {} });
+window.addEventListener('unhandledrejection', e => { try { toast('ERRO async: ' + (e.reason && e.reason.message || e.reason), 'error'); } catch (_) {} });
 window.addEventListener('hashchange', route);
 
 // Tenta re-enviar registros pendentes do buffer local. Roda em background

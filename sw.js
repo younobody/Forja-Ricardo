@@ -93,7 +93,7 @@
  * o shell antigo.
  */
 
-const CACHE_VERSION = 'forja-v30.6.0';
+const CACHE_VERSION = 'forja-v30.6.1';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const ASSETS = [
   './',

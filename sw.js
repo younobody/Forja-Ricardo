@@ -45,6 +45,15 @@
  * dashboard do aluno em localStorage) - bump aqui so pra invalidar o cache
  * antigo do shell. As chamadas novas continuam sendo ao Apps Script
  * (network-only aqui, nada muda neste arquivo alem da versao).
+ * v30.7.0: BUMP DE VERSAO. As tres mudancas sao no HTML e no backend, nada
+ * neste arquivo alem da versao: (1) detector de divergencia - a sugestao de
+ * carga continua aparecendo, mas avisa citando a regra do plano que ela
+ * contraria; (2) delete de registro por pk (o delete por timestamp apagava a
+ * sessao inteira do mesmo instante); (3) codigo de login alfanumerico.
+ * A PARTIR DAQUI o bump deste arquivo e conferido por script: o gate
+ * forja/_pecas_v30/verificar_release.py reprova o deploy se CACHE_VERSION
+ * divergir do FORJA_VERSION do HTML - que e a causa historica de "o celular
+ * ficou preso na versao velha".
  * v30.6.0: A ENTRADA DO CDNJS SAIU DO ASSETS. O Chart.js nao existe mais
  * no app - o grafico da EVOLUCAO virou SVG gerado pelo proprio HTML
  * (evoSvgUnico/evoSvgComparar). Com isso morreu tambem o estado "grafico
@@ -93,7 +102,7 @@
  * o shell antigo.
  */
 
-const CACHE_VERSION = 'forja-v30.6.1';
+const CACHE_VERSION = 'forja-v30.7.0';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const ASSETS = [
   './',

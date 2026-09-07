@@ -4195,7 +4195,13 @@
     </div>
     <div class="max-w-xs mx-auto glass p-6 corners">
       <label class="mono text-[10px] tracking-widest text-zinc-500 block mb-2">SEU CODIGO</label>
-      <input id="home-pin" type="password" inputmode="numeric" placeholder="••••" autocomplete="current-password" class="w-full text-center text-2xl tracking-[0.3em] mb-4" />
+      <!-- v30.7.0: codigo deixou de ser numerico. f_login busca SO pelo pin,
+           sem usuario, entao 4 digitos eram 10.000 combinacoes varriveis por
+           forca bruta (o pg_sleep(0.3) do ramo de erro nao freia requisicao
+           concorrente). Com 8 alfanumericos o espaco vai a ~10^12.
+           inputmode=text pro teclado do Android trazer letras; sem
+           autocapitalize, que maiusculizava a primeira letra em silencio. -->
+      <input id="home-pin" type="password" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="32" placeholder="••••••••" autocomplete="current-password" class="w-full text-center text-2xl tracking-[0.3em] mb-4" />
       <button id="btn-home-entrar" class="btn btn-primary w-full">ENTRAR ▸</button>
       <div id="home-login-status" class="mono text-xs mt-3 text-center"></div>
       <div class="mono text-[10px] text-zinc-600 mt-4 text-center tracking-wider leading-relaxed">
@@ -5416,7 +5422,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v30.6.1';
+const FORJA_VERSION = 'v30.7.0';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao
@@ -7658,7 +7664,11 @@ function _buildSessionCard(grupo, isTrainer) {
   const cor = dayColorHex(dia);
   const linhas = regsD.map(r => {
     const ok = String(r.completou).toLowerCase() === 'sim';
-    const delBtn = `<button data-ts="${escapeHtml(String(r.timestamp))}" class="btn-del-reg text-zinc-700 hover:text-red-500 mono ml-1" title="remover">✕</button>`;
+    // v30.7.0: data-pk e a chave real da linha. O delete por timestamp apagava
+    // a SESSAO INTEIRA daquele instante (11 grupos, 44 linhas expostas em
+    // 07/09/2026; pior caso, 8 registros num clique). data-ts fica como
+    // fallback pra payload antigo em cache, que nao tem pk.
+    const delBtn = `<button data-pk="${escapeHtml(String(r.pk == null ? '' : r.pk))}" data-ts="${escapeHtml(String(r.timestamp))}" class="btn-del-reg text-zinc-700 hover:text-red-500 mono ml-1" title="remover">✕</button>`;
     const rir = (r.rir !== '' && r.rir != null)
       ? `<span class="mono text-zinc-600 whitespace-nowrap">RIR ${escapeHtml(String(r.rir))}</span>` : '';
     return `
@@ -7841,17 +7851,31 @@ function _attachEvoHistoricoListeners(c, containerId, isTrainer) {
       if (!confirm('Remover este registro? Esta acao nao pode ser desfeita.')) return;
       showLoading(true);
       try {
+        // v30.7.0: manda pk (e mantem timestamp como fallback legado). O
+        // backend prefere o pk; sem ele, apaga no maximo 1 linha via ctid.
+        let rDel;
         if (isTrainer) {
-          await apiPost({ action: 'removerRegistro', key: APP.trainerKey, timestamp: b.dataset.ts });
+          rDel = await apiPost({
+            action: 'removerRegistro',
+            key: APP.trainerKey,
+            pk: b.dataset.pk || '',
+            aluno_id: APP.currentAluno || '',
+            timestamp: b.dataset.ts,
+          });
         } else {
-          await apiPost({
+          rDel = await apiPost({
             action: 'removerRegistroAluno',
             aluno_id: APP.alunoSession.id,
             pin: APP.alunoSession.pin,
+            pk: b.dataset.pk || '',
             timestamp: b.dataset.ts,
           });
         }
-        toast('Registro removido', 'success');
+        // v30.7.0: o backend ja devolvia 'removidos' e o app jogava fora,
+        // toastando "Registro removido" mesmo quando apagou 8. Agora fala a
+        // verdade — e e assim que uma regressao deste bug apareceria na tela.
+        const nDel = (rDel && typeof rDel.removidos === 'number') ? rDel.removidos : 1;
+        toast(nDel === 1 ? 'Registro removido' : nDel + ' registros removidos', 'success');
         if (isTrainer) {
           loadEditAluno(APP.currentAluno);
         } else {
@@ -9402,6 +9426,128 @@ function soProgrideEmReps(obs) {
   return /progride\s+s[o\u00f3]\s+em\s+reps/i.test(String(obs == null ? '' : obs));
 }
 
+// ===== v30.7.0: DETECTOR DE DIVERGENCIA =====
+//
+// DECISAO DO MARCOS (07/09/2026), registrada aqui pra nao ser revertida por
+// engano: a sugestao de carga CONTINUA aparecendo, com o botao de aplicar.
+// O app NAO veta. Ele avisa, citando a frase do proprio plano que conflita.
+//
+// Por que avisar e melhor que vetar, neste app:
+//   - um veto ESCONDE o numero e nao explica por que sumiu;
+//   - um aviso mostra o numero E a regra em conflito, e quem decide e quem
+//     escreveu a regra (ele e o trainer, nao so o aluno);
+//   - o parser roda sobre PROSA e vai ter falso positivo. Com veto, falso
+//     positivo tira uma funcionalidade em silencio. Com aviso, custa uma
+//     leitura de meio segundo.
+// Isso NAO contraria o principio de 9368-9370 ("so pode VETAR, nunca
+// autorizar"): aquele principio governa o CALCULO, que aqui nao mudou. O que
+// muda e o que se exibe ao lado dele.
+//
+// REQUISITO DE PROJETO, nao cosmetico: o aviso cita SEMPRE o trecho da obs que
+// disparou. Aviso generico ("divergencia do plano") vira fadiga — em poucas
+// semanas ele e ignorado por reflexo e o problema volta pior, porque parece
+// resolvido. Citar a frase faz o aviso se auto-explicar.
+//
+// COBERTURA. Familias de regra que ele ja escreve na obs, verificaveis contra
+// o que esta nos campos:
+//   teto de carga        "TETO DE CARGA em 30kg" / "Travado em 25kg"
+//   falha proibida       "FALHA PROIBIDA"                     -> RIR 0
+//   teto de RIR          "TETO RIR 2 continua valendo"        -> RIR abaixo
+//   teto de reps         "Travar em 15 reps, nao deixar passar"
+//   progride so em reps  (reusa soProgrideEmReps)
+//   bloqueio por sintoma "NAO subir carga enquanto ombro > 0"
+// Ficam de fora de proposito, por nao serem verificaveis a partir dos campos:
+// teto de amplitude ("TETO 90 GRAUS") e calibracao por lado ("calibrar pela
+// perna ESQUERDA"). Continuam sendo lembrete de leitura — e mais honesto o app
+// nao fingir que confere o que nao confere.
+//
+// Acentos escritos como \uXXXX, mesma convencao de soProgrideEmReps acima.
+
+// Recorta a vizinhanca do casamento pra citar a frase dele de volta. O recorte
+// e por caractere e nao por frase porque a obs nao tem pontuacao confiavel
+// (linhas coladas, "ULTIMO 31/08:" no meio, etc).
+function _trechoDaObs(obs, m) {
+  const i = (m && typeof m.index === 'number') ? m.index : 0;
+  const ini = Math.max(0, i - 20);
+  const fim = Math.min(obs.length, i + 90);
+  let s = obs.slice(ini, fim).replace(/\s+/g, ' ').trim();
+  if (ini > 0) s = '…' + s;
+  if (fim < obs.length) s = s + '…';
+  return s;
+}
+
+// p    = item do plano (usa p.obs e p.carga)
+// vals = { carga, reps, rir } ja NUMERICOS (null quando nao da pra ler)
+// Devolve [] quando nao ha conflito — e o caso comum, e tem que ser barato.
+function conflitosDoPlano(p, vals) {
+  const obs = String((p && p.obs) || '');
+  const out = [];
+  if (!obs) return out;
+  const v = vals || {};
+  const cargaPlano = parseCargaNum(p && p.carga);
+  // "subiu" = acima do que o plano prescreve. E o gatilho das regras que falam
+  // de PROGRESSAO (bloqueio por sintoma, progride so em reps): elas nao dizem
+  // nada sobre repetir a carga atual, so sobre aumentar.
+  const subiu = (v.carga != null && cargaPlano != null && v.carga > cargaPlano);
+  let m;
+
+  // 1. TETO DE CARGA — reusa o parser que ja existe, entao o formato aceito e
+  //    exatamente o mesmo do card de sugestao. Independe de "subiu": estar
+  //    acima do teto e violacao mesmo que o plano ja estivesse acima.
+  const teto = tetoDeCargaDaObs(obs);
+  if (teto != null && v.carga != null && v.carga > teto) {
+    m = obs.match(/\bteto[^.\n]{0,60}/i) || obs.match(/trav(?:ado|ada|ar)\s+em[^.\n]{0,60}/i);
+    out.push({
+      rotulo: 'teto de carga ' + fmtCargaKg(teto) + ' — voce pos ' + fmtCargaKg(v.carga),
+      trecho: m ? _trechoDaObs(obs, m) : ''
+    });
+  }
+
+  // 2. FALHA PROIBIDA — RIR 0 e falha. Vale pro terra e pro stiff, onde a
+  //    lombar e prioridade 1 da hierarquia dele.
+  m = obs.match(/falha\s+proibida/i);
+  if (m && v.rir != null && v.rir <= 0) {
+    out.push({ rotulo: 'o plano proibe falha neste exercicio, e voce registrou RIR 0',
+               trecho: _trechoDaObs(obs, m) });
+  }
+
+  // 3. TETO DE RIR — "TETO RIR 2" quer dizer: nunca desca abaixo de 2.
+  m = obs.match(/teto\s+rir\s*:?\s*(\d+)/i);
+  if (m && v.rir != null && v.rir < parseInt(m[1], 10)) {
+    out.push({ rotulo: 'teto de RIR ' + m[1] + ' — voce registrou RIR ' + v.rir,
+               trecho: _trechoDaObs(obs, m) });
+  }
+
+  // 4. TETO DE REPS — "Travar em 15 reps, nao deixar passar". Nao confundir
+  //    com teto de CARGA: aqui o numero termina em "reps", nao em "kg".
+  m = obs.match(/trav(?:ar|ado|ada)\s+(?:em\s+)?(\d+)\s*reps/i);
+  if (m && v.reps != null && v.reps > parseInt(m[1], 10)) {
+    out.push({ rotulo: 'o plano trava em ' + m[1] + ' reps — voce registrou ' + v.reps,
+               trecho: _trechoDaObs(obs, m) });
+  }
+
+  // 5. PROGRIDE SO EM REPS — reusa o detector existente pro texto bater com o
+  //    do card. So conflita se a carga de fato subiu.
+  if (subiu && soProgrideEmReps(obs)) {
+    m = obs.match(/progride\s+s[oó]\s+em\s+reps[^.\n]{0,50}/i);
+    out.push({ rotulo: 'o plano manda progredir so em reps, e a carga subiu',
+               trecho: m ? _trechoDaObs(obs, m) : '' });
+  }
+
+  // 6. BLOQUEIO POR SINTOMA — a familia que motivou tudo isto. Caso real:
+  //    Shoulder press, obs "NAO subir carga enquanto ombro > 0", e o app
+  //    oferecia 42,5kg lendo essa mesma string.
+  m = obs.match(/n[aã]o\s+(?:subir|aumentar|progredir)[^.\n]{0,70}/i)
+   || obs.match(/progress[aã]o\s+bloqueada[^.\n]{0,70}/i)
+   || obs.match(/manter\s+\d+(?:[.,]\d+)?\s*kg\s+at[eé][^.\n]{0,60}/i);
+  if (m && subiu) {
+    out.push({ rotulo: 'o plano bloqueia a progressao deste exercicio',
+               trecho: _trechoDaObs(obs, m) });
+  }
+
+  return out;
+}
+
 // v30.2.0 (2o defeito do mesmo bug): as reps REAIS por serie moram na OBS DO
 // REGISTRO. O Marcos loga a FAIXA do plano no campo reps ("15-20", igualzinha
 // a do plano) e escreve "15/15/15" na obs. O heuristico antigo fazia
@@ -9496,7 +9642,12 @@ function sugestaoProgressao(nome, planoItem) {
     if (novaNum > cargaNum) {
       const nova = fmtCargaKg(novaNum);
       const ate = (teto != null && novaNum === teto) ? ' — ultimo degrau ate o teto' : '';
-      return { ult, tipo: 'sobe', novaCarga: nova,
+      // v30.7.0: a sugestao SAI DO MESMO JEITO. O que vai junto e a lista de
+      // regras do plano que ela contraria — decisao do Marcos: avisar, nao
+      // vetar. novaCarga continua preenchida, entao o toque pra aplicar segue
+      // funcionando; o card so muda de cor e ganha a citacao.
+      const confl = conflitosDoPlano(p, { carga: novaNum, reps: null, rir: null });
+      return { ult, tipo: 'sobe', novaCarga: nova, conflitos: confl,
         texto: '↑ SUGESTAO: ' + nova + ' (sobrou RIR ' + rir + ')' + ate };
     }
   }
@@ -9834,20 +9985,40 @@ function mostrarExercicioAtual() {
   TREINAR.sugestaoAtual = sug;
   const elSug = $('treinar-sugestao');
   if (sug && sug.texto) {
-    elSug.textContent = sug.texto + (sug.novaCarga ? ' · toque pra aplicar' : '');
+    // v30.7.0: quando a sugestao conflita com uma regra escrita no plano, o
+    // texto ganha uma linha por conflito CITANDO a frase dele. textContent +
+    // white-space:pre-line em vez de innerHTML: o trecho vem da obs, que e
+    // texto livre — assim nao ha caminho de markup, sem depender de escapeHtml.
+    const conflSug = (sug.conflitos && sug.conflitos.length) ? sug.conflitos : null;
+    let txtSug = sug.texto + (sug.novaCarga ? ' · toque pra aplicar' : '');
+    if (conflSug) {
+      txtSug += '\n' + conflSug.map(function (c) {
+        return c.trecho ? '\u26a0 o plano diz: \u201c' + c.trecho + '\u201d'
+                        : '\u26a0 ' + c.rotulo;
+      }).join('\n');
+    }
+    elSug.style.whiteSpace = 'pre-line';
+    elSug.textContent = txtSug;
     // cores do design system (mesmas do mapa muscular) via style inline —
     // o CSS do app e Tailwind PRE-compilado, classe nova nao existe no bundle.
     // v30.2.0: 'teto' (esta no teto, tudo certo) sai ambar igual a meta;
     // 'teto-acima' sai no vermelho de FALTA (#EB4D45) porque e violacao de uma
     // regra do plano, nao um aviso. Sem os dois casos aqui, os dois cairiam no
     // cinza de 'mantem' e o alerta mais importante da tela ficaria discreto.
-    const corSug = {
+    let corSug = {
       sobe:         { c: '#10935E', b: 'rgba(16,147,94,.45)',  bg: 'rgba(16,147,94,.06)' },
       meta:         { c: '#C77400', b: 'rgba(199,116,0,.45)',  bg: 'rgba(199,116,0,.07)' },
       teto:         { c: '#C77400', b: 'rgba(199,116,0,.45)',  bg: 'rgba(199,116,0,.07)' },
       'teto-acima': { c: '#EB4D45', b: 'rgba(235,77,69,.55)',  bg: 'rgba(235,77,69,.10)' },
       mantem:       { c: '#6E7683', b: 'rgba(110,118,131,.35)', bg: 'transparent' },
     }[sug.tipo] || { c: '#6E7683', b: 'rgba(110,118,131,.35)', bg: 'transparent' };
+    // v30.7.0: conflito repinta o card no vermelho de 'teto-acima', mesmo
+    // quando o tipo e 'sobe' (verde). O verde diria "pode ir" a um passo que o
+    // plano contesta. A sugestao continua la e continua aplicavel — muda so a
+    // temperatura, que e o ponto: "da pra fazer, mas leia isto antes".
+    if (conflSug) {
+      corSug = { c: '#EB4D45', b: 'rgba(235,77,69,.55)', bg: 'rgba(235,77,69,.10)' };
+    }
     elSug.style.color = corSug.c;
     elSug.style.borderColor = corSug.b;
     elSug.style.background = corSug.bg;
@@ -9952,6 +10123,36 @@ async function salvarRegistroAtual(completou) {
   if (TREINAR.salvos[idx]) {
     toast('Este exercicio ja foi registrado nesta sessao', 'info');
     return false;
+  }
+  // v30.7.0: DETECTOR DE DIVERGENCIA no momento do registro (nao so no treino
+  // seguinte, via card de sugestao). Roda ANTES da trava de data/sessao: se ele
+  // cancelar pra corrigir, nada aconteceu ainda.
+  // NAO BLOQUEIA. O registro tem que guardar o que aconteceu de verdade — a
+  // funcao do confirm e tornar a divergencia consciente, nao impedi-la.
+  // Sem conflito nenhum a lista vem vazia e o save segue direto, sem friccao.
+  if (completou !== 'nao') {
+    // A obs lida e a do item REALMENTE registrado. Com o modal TROCAR o
+    // exercicio salvo pode nao ser o do plano, e o teto do item nao vale pro
+    // substituto — nesse caso nao ha regra a conferir.
+    const trocou = TREINAR.substituto && TREINAR.substituto[idx] &&
+                   slugify(String(TREINAR.substituto[idx])) !== slugify(String((p && p.exercicio) || ''));
+    if (!trocou) {
+      // parseCargaNum devolve null em "peso corp." / "30kg assist." / vazio —
+      // e nesses casos nenhuma regra de carga dispara, evitando confirm fantasma.
+      const confl = conflitosDoPlano(p, {
+        carga: parseCargaNum($('treinar-input-carga').value),
+        reps:  numMaxDe($('treinar-input-reps').value),
+        rir:   numMinDe($('treinar-input-rir').value),
+      });
+      if (confl.length) {
+        const lista = confl.map(function (c) {
+          return '\u2022 ' + c.rotulo + (c.trecho ? '\n  \u201c' + c.trecho + '\u201d' : '');
+        }).join('\n\n');
+        if (!confirm('Isto diverge do plano:\n\n' + lista +
+                     '\n\nOK = salvar assim mesmo (o registro guarda o que aconteceu de verdade).' +
+                     '\nCancelar = voltar e corrigir.')) return false;
+      }
+    }
   }
   // v15: congela a data no 1o save e reusa em todos os exercicios da sessao
   if (!TREINAR.dataTreino) {

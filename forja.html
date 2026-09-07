@@ -2923,7 +2923,12 @@
   -webkit-tap-highlight-color:transparent;
 }
 .frq-pack *{box-sizing:border-box}
-.frq-pack button{margin:0;font-family:inherit;color:inherit;background:none;border:0;appearance:none}
+/* v30.7.1: :where() zera a especificidade do seletor — sem isto,
+   ".frq-pack button" (classe+tipo = 0,1,1) sempre vence ".frq-c--str" e
+   companhia (uma classe so = 0,1,0), e NENHUM dia do mapa de calor pinta,
+   nao importa a ordem no arquivo. Com :where() o reset cai pra 0,1,0 e
+   empata com as classes do calendario, que vem depois e vencem no empate. */
+.frq-pack :where(button){margin:0;font-family:inherit;color:inherit;background:none;border:0;appearance:none}
 
 /* ---------- card base: aco escovado + graos + rebites ---------- */
 .frq-card{
@@ -5422,7 +5427,7 @@
 //        dos exercicios conhecidos, mas aceita digitar qualquer nome novo);
 //        reaproveita toda a maquina de estado do TREINAR, entao fecha/salva
 //        igual a qualquer outro exercicio.
-const FORJA_VERSION = 'v30.7.0';
+const FORJA_VERSION = 'v30.7.1';
 
 // v29.5.0: backend = Supabase (Postgres em sa-east-1). A anon key abaixo e
 // PUBLICA por design (igual a URL do Apps Script antes): sozinha ela nao

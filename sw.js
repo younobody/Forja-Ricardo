@@ -100,9 +100,13 @@
  * link discreto pra ele na tela de login e no rodape do painel do aluno.
  * manual.html entra em ASSETS pra abrir offline tambem. Bump pra invalidar
  * o shell antigo.
+ * v30.7.1: BUGFIX no HTML (mapa de calor de frequencia nunca pintava dia
+ * nenhum - especificidade CSS, ".frq-pack button" vencia as classes de cor
+ * do calendario). Frontend-only; bump aqui so pra invalidar o cache antigo
+ * do shell.
  */
 
-const CACHE_VERSION = 'forja-v30.7.0';
+const CACHE_VERSION = 'forja-v30.7.1';
 const SHELL_CACHE = CACHE_VERSION + '-shell';
 const ASSETS = [
   './',

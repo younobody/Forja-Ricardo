@@ -242,7 +242,7 @@
       </svg>
     </div>
     <div class="hero-txt">
-      <p class="kicker">Manual de uso · atualizado na v29.10.0</p>
+      <p class="kicker">Manual de uso · atualizado na v30.7.0</p>
       <h1>FORJA<span class="dot">.</span></h1>
       <p class="lede">Seu treino registrado em segundos, direto do celular. Este manual mostra cada tela do app — o que fazer, onde tocar e o que cada número significa.</p>
     </div>
@@ -337,9 +337,10 @@
       <div class="passo solo">
         <div>
           <ol class="steps">
-            <li>Digite seu <strong>código de 4 dígitos</strong> no campo <em>SEU CÓDIGO</em>.</li>
+            <li>Digite seu <strong>código</strong> no campo <em>SEU CÓDIGO</em>. São 8 caracteres, com letras e números — por exemplo <code>6V33NQYS</code>.</li>
             <li>Toque em <strong>ENTRAR</strong>. Sua tela abre na hora, com o plano do dia.</li>
           </ol>
+          <div class="nota"><strong>O código mudou em 07/09/2026.</strong> Antes eram 4 dígitos só de número. O problema: para entrar bastava acertar o código — o app não pede usuário — e 4 dígitos são só dez mil combinações, que um programa testa em minutos. Com 8 caracteres passam a ser mais de um trilhão. Se o seu antigo parou de funcionar, é isso: peça o novo ao trainer.<br><br>As letras são todas maiúsculas, e o código nunca usa os caracteres que se confundem: não tem <strong>O</strong> nem zero, não tem <strong>I</strong>, <strong>l</strong> nem um. Se parecer um desses, olhe de novo — é outro caractere.</div>
           <p style="margin-top:14px">Na tela de abertura também aparece o <strong>QUEM TÁ TREINANDO</strong>: um resumo de quem treinou nos últimos dias, com sequência de dias seguidos e o campeão do mês. É só motivação — ninguém vê carga, peso ou medida de ninguém.</p>
           <div class="nota"><strong>Perdeu o código?</strong> Fale com o trainer. Ele consegue ver e trocar seu código a qualquer momento.</div>
         </div>
@@ -511,6 +512,14 @@
           </div>
           <p style="margin-top:14px">Ele só sugere subir quando você fechou a última, sobrou gás (RIR 2 ou mais) e bateu as repetições planejadas. É <strong>sugestão</strong>: se o dia estiver ruim, ignore.</p>
 
+          <h3 style="margin-top:26px">Quando o card fica vermelho</h3>
+          <p>Às vezes a conta diz "dá para subir", mas as observações do seu plano dizem o contrário — um teto de carga, uma trava por causa de dor, um exercício que só progride em repetição. Quando isso acontece, o card <strong>fica vermelho</strong> e mostra, logo abaixo da sugestão, a frase do plano que está em conflito:</p>
+          <div class="legend" style="margin-top:12px">
+            <span class="lg"><span class="dot9" style="background:#EB4D45"></span>↑ SUGESTÃO: 42,5kg — ⚠ o plano diz: "NÃO subir carga enquanto ombro &gt; 0"</span>
+          </div>
+          <p style="margin-top:14px">Repare que <strong>a sugestão continua ali e continua funcionando</strong> — dá para tocar e aplicar do mesmo jeito. O app não decide por você: ele mostra a conta <em>e</em> a regra, e quem escolhe é você, que conhece o dia e o corpo. O vermelho é só para você não passar batido.</p>
+          <div class="nota">Se aparecer um aviso que não faz mais sentido — uma trava antiga que já foi liberada, por exemplo —, o texto citado está na observação daquele exercício no plano. Peça ao trainer para atualizar a observação e o aviso some.</div>
+
           <h3 style="margin-top:26px">Outros botões dessa tela</h3>
           <ul class="bul">
             <li><strong>⇄ TROCAR</strong> — aparece quando existe um exercício equivalente (ex.: Prancha ↔ Pallof press). A troca vale só para esse treino; seu plano não muda.</li>
@@ -518,6 +527,11 @@
             <li><strong>+ EXERCÍCIO EXTRA</strong> — fez algo a mais que não estava no plano? Adicione aqui.</li>
             <li><strong>DATA DO TREINO</strong> — está treinando hoje mas quer lançar como ontem? Mude a data antes de fechar o primeiro exercício.</li>
           </ul>
+
+          <h3 style="margin-top:26px">"Isto diverge do plano"</h3>
+          <p>Ao fechar um exercício, o app pode perguntar isso. Acontece quando o que você digitou passa de alguma regra escrita no seu plano: carga acima do teto, RIR 0 num exercício onde a falha é proibida, mais repetições do que o combinado.</p>
+          <p><strong>Ele não impede.</strong> Toque em OK e salva assim mesmo — e é isso que você deve fazer se foi o que realmente aconteceu. O registro serve para guardar a verdade do treino, não para ficar bonito. A pergunta existe só para você não gravar por engano um número que contraria o plano sem perceber.</p>
+          <p>Se não apareceu nada, é porque não havia divergência nenhuma — no dia normal você nem vê essa pergunta.</p>
         </div>
 
         <figure class="tela">
@@ -728,7 +742,7 @@
     <!-- ============ TRAINER ============ -->
     <section id="trainer">
       <div class="partline"><span class="parttag tag-trainer">Trainer</span><h2>Painel do trainer</h2></div>
-      <p class="sub">Mesma tela de entrada do aluno — só que digitando a chave de trainer em vez do PIN de 4 dígitos.</p>
+      <p class="sub">Mesma tela de entrada do aluno — só que digitando a chave de trainer em vez do código do aluno.</p>
 
       <div class="passo">
         <div>
@@ -838,6 +852,15 @@
         <details>
           <summary>Registrei errado. Como apago?</summary>
           <p>Na <strong>Evolução</strong>, dentro de "Sessões registradas", dá para remover registros. Se preferir refazer a sessão inteira, é só lançar de novo no mesmo dia e escolher <strong>sobrescrever</strong> quando o app perguntar.</p>
+          <p>Depois de apagar, o app diz quantos registros saíram. Se você mandou apagar um e ele avisar que apagou mais de um, me chame — não é para acontecer.</p>
+        </details>
+        <details>
+          <summary>Meu código parou de funcionar.</summary>
+          <p>Em 07/09/2026 os códigos mudaram de 4 números para 8 caracteres com letras e números. O antigo não vale mais. Peça o novo ao trainer. Seus treinos, pesos e medidas continuam todos lá — só a chave da porta mudou.</p>
+        </details>
+        <details>
+          <summary>O card de sugestão apareceu vermelho, com um aviso. Posso subir a carga assim mesmo?</summary>
+          <p>Pode — o botão continua funcionando. O vermelho quer dizer que a sugestão contraria alguma observação do seu plano, e o app mostra qual é a frase. Ele não decide por você: mostra os dois lados. Se a observação estiver velha e já não valer, peça ao trainer para atualizá-la.</p>
         </details>
         <details>
           <summary>Fiz o treino A mas só um exercício extra (um pedal, por exemplo). Conta como treino A?</summary>
@@ -870,7 +893,7 @@
 </div>
 
 <footer>
-  <div class="wrap">FORJA · MANUAL DE USO · V29.8.2 · FORJANDO A SAÚDE — FICA FORTE, FICA FORJA.</div>
+  <div class="wrap">FORJA · MANUAL DE USO · V30.7.0 · FORJANDO A SAÚDE — FICA FORTE, FICA FORJA.</div>
 </footer>
 
 </body>
